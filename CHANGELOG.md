@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] — 2026-09-10
+
+### Added
+- 🗂️ Chrome Tab Groups integration: detect grouped tabs and optionally protect entire tab groups from suspension
+- ⚙️ Settings toggle to enable/disable tab group protection (`noSuspendGrouped`, default: off)
+- 🔐 Added `tabGroups` permission in `manifest.json`
+- 🌍 Translations in English, Português (Brasil), and Español for tab group settings
+- 🧪 Unit tests for tab group exclusion and eligibility
+
+---
+
 ## [1.3.0] — 2026-09-10
 
 ### Added

@@ -82,6 +82,9 @@ function isTabEligible(tab, settings, lastActiveMs, nowMs, forceAll = false, isE
   if (settings.noSuspendPinned && tab.pinned)  return { eligible: false, reason: 'pinned' };
   if (settings.noSuspendAudio  && tab.audible) return { eligible: false, reason: 'audible' };
   if (settings.noSuspendForms  && hasUnsavedForm) return { eligible: false, reason: 'unsaved_form' };
+  if (settings.noSuspendGrouped && typeof tab.groupId === 'number' && tab.groupId > -1) {
+    return { eligible: false, reason: 'grouped' };
+  }
   if (isSystemUrl(tab.url))                    return { eligible: false, reason: 'system_url' };
   if (!tab.url || tab.url === 'about:blank')   return { eligible: false, reason: 'no_url' };
   if (isDomainWhitelisted(tab.url, settings.whitelist))    return { eligible: false, reason: 'domain_whitelisted' };

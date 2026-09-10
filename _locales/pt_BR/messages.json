@@ -28,6 +28,8 @@
   "noSuspendPinnedDesc": { "message": "Abas fixas sempre permanecer\u00e3o ativas" },
   "noSuspendForms": { "message": "N\u00e3o suspender abas com formul\u00e1rios preenchidos" },
   "noSuspendFormsDesc": { "message": "Evita perder textos digitados, mensagens em rascunho ou cadastros" },
+  "noSuspendGrouped": { "message": "N\u00e3o suspender abas em grupos" },
+  "noSuspendGroupedDesc": { "message": "Abas organizadas em grupos do Chrome permanecer\u00e3o ativas" },
   "suspendOnMinimize": { "message": "Suspender abas ao minimizar a janela" },
   "suspendOnMinimizeDesc": { "message": "Suspende todas as abas eleg\u00edveis quando o Chrome perde o foco" },
   "languageLabel": { "message": "Idioma" },
