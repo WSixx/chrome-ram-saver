@@ -65,5 +65,7 @@
   "excludeDomain": { "message": "Dominio" },
   "excludeUrl": { "message": "URL" },
   "wlDomainTitle": { "message": "Excluir este dominio de la suspensi\u00f3n" },
-  "wlUrlTitle": { "message": "Excluir esta URL exacta de la suspensi\u00f3n" }
+  "wlUrlTitle": { "message": "Excluir esta URL exacta de la suspensi\u00f3n" },
+  "showBadge": { "message": "Mostrar contador en el icono" },
+  "showBadgeDesc": { "message": "Muestra el n\u00famero de pesta\u00f1as suspendidas directamente en el icono de la extensi\u00f3n" }
 }

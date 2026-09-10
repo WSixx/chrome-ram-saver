@@ -27,7 +27,9 @@ const DEFAULT_SETTINGS = {
   lazyLoadStartup: true,
   activeTabLimit: false,
   activeTabLimitCount: 20,
-  aggressiveMode: false
+  aggressiveMode: false,
+  // Badge
+  showBadge: true
 };
 
 // ---------------------------------------------------------------------------
@@ -58,6 +60,24 @@ function isUrlWhitelisted(url, whitelistUrls) {
 function isSystemUrl(url) {
   if (!url) return true;
   return SYSTEM_URL_PREFIXES.some(p => url.startsWith(p));
+}
+
+// ---------------------------------------------------------------------------
+// Badge management
+// ---------------------------------------------------------------------------
+async function updateBadge() {
+  try {
+    const { showBadge = true } = await chrome.storage.sync.get('showBadge');
+    if (!showBadge) {
+      await chrome.action.setBadgeText({ text: '' });
+      return;
+    }
+    const tabs = await chrome.tabs.query({});
+    const count = tabs.filter(t => t.discarded).length;
+    const text = count > 0 ? (count > 99 ? '99+' : String(count)) : '';
+    await chrome.action.setBadgeText({ text });
+    await chrome.action.setBadgeBackgroundColor({ color: '#2563EB' });
+  } catch {}
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +114,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     activityMap[`tab_${tab.id}`] = tab.active ? now : now - 60000;
   }
   await chrome.storage.session.set(activityMap);
+  await updateBadge();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -116,6 +137,7 @@ chrome.runtime.onStartup.addListener(async () => {
     if (isUrlWhitelisted(tab.url, whitelistUrls)) continue;
     try { await chrome.tabs.discard(tab.id); } catch {}
   }
+  await updateBadge();
 });
 
 // ---------------------------------------------------------------------------
@@ -128,6 +150,9 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (changeInfo.status === 'complete') {
     await chrome.storage.session.set({ [`tab_${tabId}`]: Date.now() });
+  }
+  if (changeInfo.discarded !== undefined || changeInfo.status === 'complete') {
+    updateBadge();
   }
 });
 
@@ -160,10 +185,12 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   if (eligible.length > 0) {
     try { await chrome.tabs.discard(eligible[0].id); } catch {}
   }
+  updateBadge();
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   await chrome.storage.session.remove(`tab_${tabId}`);
+  updateBadge();
 });
 
 // ---------------------------------------------------------------------------
@@ -184,8 +211,9 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
 // Storage change listener (update alarm if aggressiveMode changes)
 // ---------------------------------------------------------------------------
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync' && changes.aggressiveMode) {
-    setupAlarm();
+  if (area === 'sync') {
+    if (changes.aggressiveMode) setupAlarm();
+    if (changes.showBadge) updateBadge();
   }
 });
 
@@ -230,6 +258,8 @@ async function suspendInactiveTabs(forceAll = false) {
     await chrome.storage.local.set({ totalSuspended: totalSuspended + newlySuspended });
   }
 
+  await updateBadge();
+
   return { suspended: newlySuspended };
 }
 
@@ -250,6 +280,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.action === 'getStats') {
     getStats().then(sendResponse);
+    return true;
+  }
+  if (message.action === 'updateBadge') {
+    updateBadge().then(sendResponse);
     return true;
   }
 });

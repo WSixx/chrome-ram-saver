@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] — 2026-09-10
+
+### Added
+- 🏷️ Live badge counter on the extension icon showing the number of suspended tabs in real-time
+- ⚙️ Settings toggle to enable/disable the icon badge counter in General settings
+- 🌍 Translations in English, Português (Brasil), and Español for badge settings
+
+---
+
 ## [1.0.0] — 2024-09-10
 
 ### Added
