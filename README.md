@@ -1,10 +1,11 @@
-# RAM Saver 🧠💾
+# RAM Saver
 
 > An open source Chrome extension that saves RAM by automatically suspending inactive tabs.
 
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue.svg)
-![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-teal.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/WSixx/chrome-ram-saver/blob/main/LICENSE)
+[![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue.svg)](https://developer.chrome.com/docs/extensions/mv3/)
+[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-teal.svg)](https://github.com/WSixx/chrome-ram-saver)
+[![GitHub release](https://img.shields.io/github/v/release/WSixx/chrome-ram-saver?color=teal)](https://github.com/WSixx/chrome-ram-saver/releases)
 
 ---
 
@@ -68,6 +69,58 @@ ram-saver/
     └── icon128.png
 ```
 
+## Testing
+
+The project has two test suites. **Requires Node.js ≥ 18.**
+
+### Setup
+
+```bash
+npm install
+npx playwright install chromium   # for e2e only
+```
+
+### Unit tests (Jest)
+
+Pure logic — no browser, no Chrome APIs. Runs in milliseconds.
+
+```bash
+npm run test:unit          # run once
+npm run test:watch         # watch mode during development
+npm run test:coverage      # with coverage report
+```
+
+Covers:
+- `normalizeUrl`, `isDomainWhitelisted`, `isUrlWhitelisted`, `isSystemUrl`
+- Tab eligibility logic (pinned, audible, whitelist, threshold, aggressive mode)
+- Input validation (`isValidDomain`, `isValidUrl`, `normalizeDomain`)
+
+### End-to-end tests (Playwright)
+
+Opens Chrome with the extension installed and tests the real UI.
+
+```bash
+npm run test:e2e
+```
+
+Covers popup (toggle, timer, stats, buttons) and options page (slider, all toggles, whitelist CRUD, advanced section, stats, about).
+
+### Test structure
+
+```
+tests/
+├── helpers/
+│   └── utils.js              # Shared pure functions (mirrored from source)
+├── unit/
+│   ├── tab-utils.test.js     # URL utility tests (~25 cases)
+│   ├── suspension-logic.test.js  # Eligibility logic tests (~30 cases)
+│   └── validation.test.js    # Input validation tests (~20 cases)
+└── e2e/
+    └── extension.test.js     # Playwright UI tests (~40 cases)
+```
+
+---
+
 ## Contributing
 
 Contributions are welcome and appreciated! Here's how to get started:
@@ -93,18 +146,47 @@ Contributions are welcome and appreciated! Here's how to get started:
 - 🌐 Add more language translations
 - 📊 Per-tab memory display (if a future Chrome API enables it)
 - 🔔 Notification when a tab is about to be suspended
-- 🧪 Automated tests with Playwright or Puppeteer
 - 🎨 Improve icon design
 
 ### Reporting bugs
 
-Open an [issue on GitHub](https://github.com) with:
+Open an [issue on GitHub](https://github.com/WSixx/chrome-ram-saver/issues) with:
 - Chrome version
 - Steps to reproduce
 - Expected vs actual behavior
 
 ---
 
+## Release
+
+Releases are published to [GitHub Releases](https://github.com/WSixx/chrome-ram-saver/releases) and can also be submitted to the Chrome Web Store.
+
+### Creating a release manually
+
+1. Bump the `version` field in [`manifest.json`](manifest.json)
+2. Update [`CHANGELOG.md`](CHANGELOG.md) — move items from `[Unreleased]` to the new version section
+3. Commit and tag:
+   ```bash
+   git add manifest.json CHANGELOG.md
+   git commit -m "chore: release v1.1.0"
+   git tag v1.1.0
+   git push origin main --tags
+   ```
+4. The [Release workflow](.github/workflows/release.yml) will automatically:
+   - Create a GitHub Release with the tag notes
+   - Package the extension as a `.zip` (excluding dev files)
+   - Attach the `.zip` as a release asset ready for the Chrome Web Store
+
+### Automated release (GitHub Actions)
+
+Push a tag matching `v*.*.*` to trigger the pipeline:
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+The release artifact will be named `ram-saver-v1.0.0.zip`.
+
+---
+
 ## License
 
-MIT © 2024
+MIT © 2024 [WSixx](https://github.com/WSixx)

@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+playwright-report/
+tests/.tmp-profile/
+*.zip
+.DS_Store
+Thumbs.db

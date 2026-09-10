@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAM Saver</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-root">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-brand">
+        <img src="../icons/icon48.png" alt="RAM Saver" class="header-icon" />
+        <span class="header-title">RAM Saver</span>
+      </div>
+      <label class="toggle" id="toggle-label">
+        <input type="checkbox" id="global-toggle" />
+        <span class="toggle-track">
+          <span class="toggle-thumb"></span>
+        </span>
+      </label>
+    </header>
+
+    <!-- Status badge -->
+    <div class="status-badge">
+      <span class="status-dot" id="status-dot"></span>
+      <span class="status-text" id="status-text"></span>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">💾</div>
+        <div class="stat-value" id="stat-mb">0</div>
+        <div class="stat-label" data-i18n="mbSaved">MB saved</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📂</div>
+        <div class="stat-value" id="stat-tabs">0</div>
+        <div class="stat-label" data-i18n="tabsSuspended">tabs suspended</div>
+      </div>
+    </div>
+
+    <!-- Quick timer -->
+    <div class="quick-timer">
+      <span class="timer-label" data-i18n="timerLabel">Suspend after</span>
+      <select id="timer-select" class="timer-select">
+        <option value="2" data-i18n="timer2">2 minutes</option>
+        <option value="5" data-i18n="timer5">5 minutes</option>
+        <option value="10" data-i18n="timer10">10 minutes</option>
+        <option value="15" data-i18n="timer15">15 minutes</option>
+        <option value="30" data-i18n="timer30" selected>30 minutes</option>
+        <option value="60" data-i18n="timer60">1 hour</option>
+      </select>
+    </div>
+
+    <!-- Current tab quick whitelist row -->
+    <div class="current-tab-row" id="current-tab-row">
+      <span class="current-tab-domain" id="current-tab-domain"></span>
+      <div class="wl-btn-group">
+        <button
+          class="btn-wl"
+          id="btn-wl-domain"
+          data-i18n-title="wlDomainTitle"
+        ></button>
+        <button
+          class="btn-wl"
+          id="btn-wl-url"
+          data-i18n-title="wlUrlTitle"
+        ></button>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn-primary" id="btn-suspend-all">
+        <span class="btn-icon">⚡</span>
+        <span data-i18n="suspendAll">Suspend All Inactive Tabs</span>
+      </button>
+      <button class="btn-settings" id="btn-settings">
+        <span>⚙️</span>
+        <span data-i18n="openSettings">Settings</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="../utils/i18n.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

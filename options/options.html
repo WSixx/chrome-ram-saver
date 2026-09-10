@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAM Saver — Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+
+  <div class="page">
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-brand">
+        <img src="../icons/icon48.png" alt="RAM Saver" class="brand-icon" />
+        <div>
+          <div class="brand-name">RAM Saver</div>
+          <div class="brand-version" id="brand-version"></div>
+        </div>
+      </div>
+
+      <ul class="nav-list">
+        <li><a href="#general" class="nav-item active" data-section="general">
+          <span class="nav-icon">⚙️</span>
+          <span data-i18n="sectionGeneral">General</span>
+        </a></li>
+        <li><a href="#advanced" class="nav-item" data-section="advanced">
+          <span class="nav-icon">🚀</span>
+          <span data-i18n="advancedTitle">Advanced</span>
+        </a></li>
+        <li><a href="#whitelist" class="nav-item" data-section="whitelist">
+          <span class="nav-icon">🛡️</span>
+          <span data-i18n="sectionWhitelist">Whitelist</span>
+        </a></li>
+        <li><a href="#stats" class="nav-item" data-section="stats">
+          <span class="nav-icon">📊</span>
+          <span data-i18n="sectionStats">Statistics</span>
+        </a></li>
+        <li><a href="#about" class="nav-item" data-section="about">
+          <span class="nav-icon">ℹ️</span>
+          <span data-i18n="sectionAbout">About</span>
+        </a></li>
+      </ul>
+    </nav>
+
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- ================================================================ -->
+      <!-- GENERAL SECTION                                                   -->
+      <!-- ================================================================ -->
+      <section id="general" class="section">
+        <h2 class="section-title" data-i18n="sectionGeneral">General</h2>
+
+        <!-- Auto-suspend enable -->
+        <div class="card">
+          <div class="field row">
+            <div class="field-info">
+              <label class="field-label" for="opt-enable" data-i18n="enableAutoSuspend">
+                Enable automatic tab suspension
+              </label>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="opt-enable" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Inactivity timer slider -->
+        <div class="card">
+          <div class="slider-header">
+            <span class="field-label" data-i18n="inactivityTimer">Inactive time</span>
+            <span class="slider-value-badge" id="timer-display">30 min</span>
+          </div>
+          <input type="range" id="opt-timer" class="slider" min="1" max="60" step="1" value="30" />
+          <div class="slider-range-labels">
+            <span>1 min</span>
+            <span>60 min</span>
+          </div>
+        </div>
+
+        <!-- Don't suspend audio tabs -->
+        <div class="card">
+          <div class="field row">
+            <div class="field-info">
+              <label class="field-label" for="opt-no-audio" data-i18n="noSuspendAudio">
+                Don't suspend tabs with audio
+              </label>
+              <p class="field-desc" data-i18n="noSuspendAudioDesc">
+                Tabs playing audio or video will be excluded
+              </p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="opt-no-audio" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Don't suspend pinned tabs -->
+        <div class="card">
+          <div class="field row">
+            <div class="field-info">
+              <label class="field-label" for="opt-no-pinned" data-i18n="noSuspendPinned">
+                Don't suspend pinned tabs
+              </label>
+              <p class="field-desc" data-i18n="noSuspendPinnedDesc">
+                Pinned tabs will always be kept active
+              </p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="opt-no-pinned" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Suspend on minimize -->
+        <div class="card">
+          <div class="field row">
+            <div class="field-info">
+              <label class="field-label" for="opt-suspend-minimize" data-i18n="suspendOnMinimize">
+                Suspend tabs when minimizing window
+              </label>
+              <p class="field-desc" data-i18n="suspendOnMinimizeDesc">
+                Suspends all eligible tabs when Chrome loses focus
+              </p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="opt-suspend-minimize" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Language -->
+        <div class="card">
+          <div class="field row">
+            <div class="field-info">
+              <label class="field-label" for="opt-lang" data-i18n="languageLabel">Language</label>
+              <p class="field-desc" data-i18n="languageDesc">Page will reload to apply.</p>
+            </div>
+            <select id="opt-lang" class="select">
+              <option value="auto"  data-i18n="languageAuto">Auto (system)</option>
+              <option value="en"    data-i18n="languageEn">English</option>
+              <option value="pt_BR" data-i18n="languagePtBr">Português (Brasil)</option>
+              <option value="es"    data-i18n="languageEs">Español</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================ -->
+      <!-- ADVANCED SECTION                                                  -->
+      <!-- ================================================================ -->
+      <section id="advanced" class="section hidden">
+        <h2 class="section-title" data-i18n="advancedTitle">Advanced Optimization</h2>
+
+        <!-- Lazy loading on startup -->
+        <div class="card">
+          <div class="field row">
+            <div class="field-info">
+              <label class="field-label" for="opt-lazy" data-i18n="lazyLoadStartup">
+                Lazy loading on startup
+              </label>
+              <p class="field-desc accent-desc" data-i18n="lazyLoadStartupDesc">
+                Doesn't load tabs automatically when opening Chrome
+              </p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="opt-lazy" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Active tab limit -->
+        <div class="card">
+          <div class="field row">
+            <div class="field-info">
+              <label class="field-label" for="opt-tab-limit" data-i18n="activeTabLimit">
+                Active tab limit
+              </label>
+              <p class="field-desc" data-i18n="activeTabLimitDesc">
+                Suspend oldest tabs when the limit is exceeded
+              </p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="opt-tab-limit" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+          <!-- Number input — shown only when enabled -->
+          <div class="sub-control hidden" id="tab-limit-control">
+            <label class="field-label-sm" for="opt-tab-limit-count" data-i18n="activeTabLimitCount">
+              Max active tabs
+            </label>
+            <input type="number" id="opt-tab-limit-count" class="number-input" min="1" max="100" value="20" />
+          </div>
+        </div>
+
+        <!-- Aggressive mode -->
+        <div class="card">
+          <div class="field row">
+            <div class="field-info">
+              <label class="field-label" for="opt-aggressive" data-i18n="aggressiveMode">
+                Aggressive saving mode
+              </label>
+              <p class="field-desc warning-desc" data-i18n="aggressiveModeDesc">
+                Suspends tabs faster when you have many open tabs
+              </p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="opt-aggressive" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================ -->
+      <!-- WHITELIST SECTION                                                 -->
+      <!-- ================================================================ -->
+      <section id="whitelist" class="section hidden">
+        <h2 class="section-title" data-i18n="sectionWhitelist">Whitelist</h2>
+
+        <!-- Domains -->
+        <div class="card">
+          <h3 class="sub-title" data-i18n="whitelistDomainsTitle">Excluded Domains</h3>
+          <p class="field-desc mb" data-i18n="whitelistDesc">
+            Tabs matching these domains will never be suspended.
+          </p>
+          <div class="input-row">
+            <input type="text" id="domain-input" class="text-input"
+              data-i18n-placeholder="addDomainPlaceholder" placeholder="e.g. github.com" />
+            <button class="btn-add" id="btn-add-domain" data-i18n="addBtn">Add</button>
+          </div>
+          <p class="field-error" id="domain-error"></p>
+          <ul class="whitelist-list" id="whitelist-list"></ul>
+          <p class="empty-msg hidden" id="whitelist-empty" data-i18n="noWhitelist">No domains added yet.</p>
+        </div>
+
+        <!-- Specific URLs -->
+        <div class="card">
+          <h3 class="sub-title" data-i18n="whitelistUrlsTitle">Excluded URLs</h3>
+          <p class="field-desc mb" data-i18n="whitelistUrlsDesc">
+            Specific pages that will never be suspended (matched by URL prefix).
+          </p>
+          <div class="input-row">
+            <input type="text" id="url-input" class="text-input"
+              data-i18n-placeholder="addUrlPlaceholder" placeholder="e.g. https://app.example.com" />
+            <button class="btn-add" id="btn-add-url" data-i18n="addBtn">Add</button>
+          </div>
+          <p class="field-error" id="url-error"></p>
+          <ul class="whitelist-list" id="whitelist-url-list"></ul>
+          <p class="empty-msg hidden" id="whitelist-url-empty" data-i18n="noWhitelistUrls">No URLs added yet.</p>
+        </div>
+      </section>
+
+      <!-- ================================================================ -->
+      <!-- STATS SECTION                                                     -->
+      <!-- ================================================================ -->
+      <section id="stats" class="section hidden">
+        <h2 class="section-title" data-i18n="sectionStats">Statistics</h2>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📂</div>
+            <div class="stat-value" id="stat-total-tabs">0</div>
+            <div class="stat-label" data-i18n="totalSuspended">Total tabs suspended</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">💾</div>
+            <div class="stat-value" id="stat-total-mb">0 MB</div>
+            <div class="stat-label" data-i18n="totalSaved">Estimated RAM saved</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px;">
+          <p class="field-desc" style="margin-bottom: 12px;">
+            RAM savings are estimated at 60 MB per suspended tab.
+            Actual savings depend on each tab's content.
+          </p>
+          <button class="btn-danger" id="btn-reset-stats" data-i18n="resetStats">Reset Statistics</button>
+        </div>
+      </section>
+
+      <!-- ================================================================ -->
+      <!-- ABOUT SECTION                                                     -->
+      <!-- ================================================================ -->
+      <section id="about" class="section hidden">
+        <h2 class="section-title" data-i18n="sectionAbout">About</h2>
+
+        <div class="card about-card">
+          <img src="../icons/icon128.png" alt="RAM Saver" class="about-icon" />
+          <h3 class="about-name">RAM Saver</h3>
+          <p class="about-version-text" id="about-version"></p>
+          <p class="about-desc">
+            An open source Chrome extension that saves RAM by automatically suspending
+            inactive tabs using Chrome's native <code>tabs.discard()</code> API.
+          </p>
+          <div class="about-links">
+            <a href="https://github.com/WSixx/chrome-ram-saver" target="_blank" class="link-pill" data-i18n="aboutGithub">
+              View on GitHub
+            </a>
+            <span class="link-pill muted" data-i18n="aboutLicense">License: MIT</span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="../utils/i18n.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
