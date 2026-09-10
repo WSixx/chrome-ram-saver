@@ -172,8 +172,9 @@ chrome.tabs.onCreated.addListener(async (tab) => {
 
   // Find LRU eligible tab to suspend
   const activityData = await chrome.storage.session.get(allTabs.map(t => `tab_${t.id}`));
+  const exemptData = await chrome.storage.session.get(allTabs.map(t => `exempt_tab_${t.id}`));
   const eligible = activeTabs
-    .filter(t => !t.active && !isSystemUrl(t.url) && t.url !== 'about:blank')
+    .filter(t => !t.active && !isSystemUrl(t.url) && t.url !== 'about:blank' && !exemptData[`exempt_tab_${t.id}`])
     .filter(t => !(noSuspendPinned && t.pinned))
     .filter(t => !(noSuspendAudio && t.audible))
     .sort((a, b) => {
@@ -189,7 +190,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
-  await chrome.storage.session.remove(`tab_${tabId}`);
+  await chrome.storage.session.remove([`tab_${tabId}`, `exempt_tab_${tabId}`]);
   updateBadge();
 });
 
@@ -234,12 +235,14 @@ async function suspendInactiveTabs(forceAll = false) {
 
   const tabs = await chrome.tabs.query({});
   const activityData = await chrome.storage.session.get(tabs.map(t => `tab_${t.id}`));
+  const exemptData = await chrome.storage.session.get(tabs.map(t => `exempt_tab_${t.id}`));
 
   let newlySuspended = 0;
 
   for (const tab of tabs) {
     if (tab.active) continue;
     if (tab.discarded) continue;
+    if (exemptData[`exempt_tab_${tab.id}`]) continue;
     if (settings.noSuspendPinned && tab.pinned) continue;
     if (settings.noSuspendAudio && tab.audible) continue;
     if (isSystemUrl(tab.url)) continue;

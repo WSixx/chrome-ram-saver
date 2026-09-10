@@ -298,7 +298,7 @@ body {
 /* Button group */
 .wl-btn-group {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -306,7 +306,7 @@ body {
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 3px 8px;
+  padding: 3px 6px;
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;

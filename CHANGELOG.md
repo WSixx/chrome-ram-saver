@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] — 2026-09-10
+
+### Added
+- 🛡️ Quick "Never suspend this tab" immunity button in the popup for the active tab (session-scoped)
+- 🧹 Automatic session immunity cleanup on tab closure
+- 🌍 Translations in English, Português (Brasil), and Español for tab immunity controls
+- 🧪 Unit tests verifying tab exemption logic and immunity against force-suspend
+
+---
+
 ## [1.1.0] — 2026-09-10
 
 ### Added
