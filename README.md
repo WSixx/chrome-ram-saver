@@ -157,36 +157,6 @@ Open an [issue on GitHub](https://github.com/WSixx/chrome-ram-saver/issues) with
 
 ---
 
-## Release
-
-Releases are published to [GitHub Releases](https://github.com/WSixx/chrome-ram-saver/releases) and can also be submitted to the Chrome Web Store.
-
-### Creating a release manually
-
-1. Bump the `version` field in [`manifest.json`](manifest.json)
-2. Update [`CHANGELOG.md`](CHANGELOG.md) — move items from `[Unreleased]` to the new version section
-3. Commit and tag:
-   ```bash
-   git add manifest.json CHANGELOG.md
-   git commit -m "chore: release v1.1.0"
-   git tag v1.1.0
-   git push origin main --tags
-   ```
-4. The [Release workflow](.github/workflows/release.yml) will automatically:
-   - Create a GitHub Release with the tag notes
-   - Package the extension as a `.zip` (excluding dev files)
-   - Attach the `.zip` as a release asset ready for the Chrome Web Store
-
-### Automated release (GitHub Actions)
-
-Push a tag matching `v*.*.*` to trigger the pipeline:
-```bash
-git tag v1.0.0 && git push origin v1.0.0
-```
-The release artifact will be named `ram-saver-v1.0.0.zip`.
-
----
-
 ## License
 
 MIT © 2024 [WSixx](https://github.com/WSixx)
