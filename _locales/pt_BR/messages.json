@@ -26,6 +26,8 @@
   "noSuspendAudioDesc": { "message": "Abas reproduzindo \u00e1udio ou v\u00eddeo ser\u00e3o exclu\u00eddas" },
   "noSuspendPinned": { "message": "N\u00e3o suspender abas fixas" },
   "noSuspendPinnedDesc": { "message": "Abas fixas sempre permanecer\u00e3o ativas" },
+  "noSuspendForms": { "message": "N\u00e3o suspender abas com formul\u00e1rios preenchidos" },
+  "noSuspendFormsDesc": { "message": "Evita perder textos digitados, mensagens em rascunho ou cadastros" },
   "suspendOnMinimize": { "message": "Suspender abas ao minimizar a janela" },
   "suspendOnMinimizeDesc": { "message": "Suspende todas as abas eleg\u00edveis quando o Chrome perde o foco" },
   "languageLabel": { "message": "Idioma" },

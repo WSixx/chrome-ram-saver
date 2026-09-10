@@ -26,6 +26,8 @@
   "noSuspendAudioDesc": { "message": "Las pesta\u00f1as con audio o v\u00eddeo estar\u00e1n excluidas" },
   "noSuspendPinned": { "message": "No suspender pesta\u00f1as fijadas" },
   "noSuspendPinnedDesc": { "message": "Las pesta\u00f1as fijadas siempre permanecer\u00e1n activas" },
+  "noSuspendForms": { "message": "No suspender pesta\u00f1as con formularios sin guardar" },
+  "noSuspendFormsDesc": { "message": "Evita perder mensajes en borrador, formularios o textos ingresados" },
   "suspendOnMinimize": { "message": "Suspender pesta\u00f1as al minimizar la ventana" },
   "suspendOnMinimizeDesc": { "message": "Suspende todas las pesta\u00f1as elegibles cuando Chrome pierde el foco" },
   "languageLabel": { "message": "Idioma" },

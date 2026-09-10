@@ -33,6 +33,7 @@ function makeSettings(overrides = {}) {
     whitelistUrls: [],
     noSuspendAudio: true,
     noSuspendPinned: true,
+    noSuspendForms: true,
     aggressiveMode: false,
     ...overrides,
   };
@@ -113,6 +114,20 @@ describe('isTabEligible() — tab state exclusions', () => {
     const result = isTabEligible(tab, settings, inactiveAgo, NOW, true, true);
     expect(result.eligible).toBe(false);
     expect(result.reason).toBe('tab_exempt');
+  });
+
+  test('tab with unsaved form is not eligible when noSuspendForms=true', () => {
+    const tab = makeTab();
+    const result = isTabEligible(tab, settings, inactiveAgo, NOW, false, false, true);
+    expect(result.eligible).toBe(false);
+    expect(result.reason).toBe('unsaved_form');
+  });
+
+  test('tab with unsaved form IS eligible when noSuspendForms=false', () => {
+    const tab = makeTab();
+    const s = makeSettings({ noSuspendForms: false });
+    const result = isTabEligible(tab, s, inactiveAgo, NOW, false, false, true);
+    expect(result.eligible).toBe(true);
   });
 });
 

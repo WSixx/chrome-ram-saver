@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] — 2026-09-10
+
+### Added
+- 📝 Form data loss protection: automatically detects unsaved inputs, textareas, and rich-text content in inactive tabs before suspension
+- ⚙️ Settings toggle to enable/disable unsaved form protection (`noSuspendForms`, enabled by default)
+- 🔐 Added `scripting` permission in `manifest.json` for non-invasive input inspection
+- 🌍 Translations in English, Português (Brasil), and Español for form protection
+- 🧪 Unit tests for form protection eligibility
+
+---
+
 ## [1.2.0] — 2026-09-10
 
 ### Added

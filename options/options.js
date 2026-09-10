@@ -10,6 +10,7 @@ const optTimer         = document.getElementById('opt-timer');
 const timerDisplay     = document.getElementById('timer-display');
 const optNoAudio       = document.getElementById('opt-no-audio');
 const optNoPinned      = document.getElementById('opt-no-pinned');
+const optNoForms       = document.getElementById('opt-no-forms');
 const optSuspendMin    = document.getElementById('opt-suspend-minimize');
 const optShowBadge     = document.getElementById('opt-show-badge');
 const optLang          = document.getElementById('opt-lang');
@@ -304,13 +305,14 @@ async function init() {
 
   const settings = await chrome.storage.sync.get([
     'enabled', 'thresholdMinutes', 'whitelist', 'whitelistUrls', 'userLanguage',
-    'noSuspendAudio', 'noSuspendPinned', 'suspendOnMinimize', 'showBadge',
+    'noSuspendAudio', 'noSuspendPinned', 'noSuspendForms', 'suspendOnMinimize', 'showBadge',
     'lazyLoadStartup', 'activeTabLimit', 'activeTabLimitCount', 'aggressiveMode'
   ]);
 
   optEnable.checked       = settings.enabled       ?? true;
   optNoAudio.checked      = settings.noSuspendAudio  ?? true;
   optNoPinned.checked     = settings.noSuspendPinned ?? true;
+  optNoForms.checked      = settings.noSuspendForms  ?? true;
   optSuspendMin.checked   = settings.suspendOnMinimize ?? false;
   optShowBadge.checked    = settings.showBadge         ?? true;
   optLazy.checked         = settings.lazyLoadStartup  ?? true;
@@ -334,6 +336,7 @@ async function init() {
   makeToggle(optEnable, 'enabled');
   makeToggle(optNoAudio, 'noSuspendAudio');
   makeToggle(optNoPinned, 'noSuspendPinned');
+  makeToggle(optNoForms, 'noSuspendForms');
   makeToggle(optSuspendMin, 'suspendOnMinimize');
   makeToggle(optShowBadge, 'showBadge');
   makeToggle(optLazy, 'lazyLoadStartup');

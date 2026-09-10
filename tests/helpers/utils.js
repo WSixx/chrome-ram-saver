@@ -75,12 +75,13 @@ function isSystemUrl(url) {
  * @param {boolean} [forceAll=false] - If true, ignore the time threshold
  * @returns {{ eligible: boolean, reason: string }}
  */
-function isTabEligible(tab, settings, lastActiveMs, nowMs, forceAll = false, isExempt = false) {
+function isTabEligible(tab, settings, lastActiveMs, nowMs, forceAll = false, isExempt = false, hasUnsavedForm = false) {
   if (tab.active)    return { eligible: false, reason: 'active' };
   if (tab.discarded) return { eligible: false, reason: 'already_discarded' };
   if (isExempt)      return { eligible: false, reason: 'tab_exempt' };
   if (settings.noSuspendPinned && tab.pinned)  return { eligible: false, reason: 'pinned' };
   if (settings.noSuspendAudio  && tab.audible) return { eligible: false, reason: 'audible' };
+  if (settings.noSuspendForms  && hasUnsavedForm) return { eligible: false, reason: 'unsaved_form' };
   if (isSystemUrl(tab.url))                    return { eligible: false, reason: 'system_url' };
   if (!tab.url || tab.url === 'about:blank')   return { eligible: false, reason: 'no_url' };
   if (isDomainWhitelisted(tab.url, settings.whitelist))    return { eligible: false, reason: 'domain_whitelisted' };
