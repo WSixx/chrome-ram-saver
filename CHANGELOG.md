@@ -17,63 +17,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.0] — 2026-09-10
 
 ### Added
-- 🗂️ Chrome Tab Groups integration: detect grouped tabs and optionally protect entire tab groups from suspension
-- ⚙️ Settings toggle to enable/disable tab group protection (`noSuspendGrouped`, default: off)
-- 🔐 Added `tabGroups` permission in `manifest.json`
-- 🌍 Translations in English, Português (Brasil), and Español for tab group settings
-- 🧪 Unit tests for tab group exclusion and eligibility
+- Chrome Tab Groups integration: detect grouped tabs and optionally protect entire tab groups from suspension
+- Settings toggle to enable/disable tab group protection (`noSuspendGrouped`, default: off)
+- Added `tabGroups` permission in `manifest.json`
+- Translations in English, Português (Brasil), and Español for tab group settings
+- Unit tests for tab group exclusion and eligibility
 
 ---
 
 ## [1.3.0] — 2026-09-10
 
 ### Added
-- 📝 Form data loss protection: automatically detects unsaved inputs, textareas, and rich-text content in inactive tabs before suspension
-- ⚙️ Settings toggle to enable/disable unsaved form protection (`noSuspendForms`, enabled by default)
-- 🔐 Added `scripting` permission in `manifest.json` for non-invasive input inspection
-- 🌍 Translations in English, Português (Brasil), and Español for form protection
-- 🧪 Unit tests for form protection eligibility
+- Form data loss protection: automatically detects unsaved inputs, textareas, and rich-text content in inactive tabs before suspension
+- Settings toggle to enable/disable unsaved form protection (`noSuspendForms`, enabled by default)
+- Added `scripting` permission in `manifest.json` for non-invasive input inspection
+- Translations in English, Português (Brasil), and Español for form protection
+- Unit tests for form protection eligibility
 
 ---
 
 ## [1.2.0] — 2026-09-10
 
 ### Added
-- 🛡️ Quick "Never suspend this tab" immunity button in the popup for the active tab (session-scoped)
-- 🧹 Automatic session immunity cleanup on tab closure
-- 🌍 Translations in English, Português (Brasil), and Español for tab immunity controls
-- 🧪 Unit tests verifying tab exemption logic and immunity against force-suspend
+- Quick "Never suspend this tab" immunity button in the popup for the active tab (session-scoped)
+- Automatic session immunity cleanup on tab closure
+- Translations in English, Português (Brasil), and Español for tab immunity controls
+- Unit tests verifying tab exemption logic and immunity against force-suspend
 
 ---
 
 ## [1.1.0] — 2026-09-10
 
 ### Added
-- 🏷️ Live badge counter on the extension icon showing the number of suspended tabs in real-time
-- ⚙️ Settings toggle to enable/disable the icon badge counter in General settings
-- 🌍 Translations in English, Português (Brasil), and Español for badge settings
+- Live badge counter on the extension icon showing the number of suspended tabs in real-time
+- Settings toggle to enable/disable the icon badge counter in General settings
+- Translations in English, Português (Brasil), and Español for badge settings
 
 ---
 
 ## [1.0.0] — 2024-09-10
 
 ### Added
-- ⚡ Automatic tab suspension via `chrome.tabs.discard()` (Manifest V3, zero dependencies)
-- 🎚️ Inactivity timer slider — 1 to 60 minutes
-- 📌 Configurable toggle: don't suspend pinned tabs (default: on)
-- 🎵 Configurable toggle: don't suspend tabs with audio (default: on)
-- 🪟 Suspend tabs when Chrome loses focus / window is minimized
-- 🚀 Advanced Optimization section:
+- Automatic tab suspension via `chrome.tabs.discard()` (Manifest V3, zero dependencies)
+- Inactivity timer slider — 1 to 60 minutes
+- Configurable toggle: don't suspend pinned tabs (default: on)
+- Configurable toggle: don't suspend tabs with audio (default: on)
+- Suspend tabs when Chrome loses focus / window is minimized
+- Advanced Optimization section:
   - **Lazy loading on startup** — discard inactive tabs when Chrome starts
   - **Active tab limit** — suspend LRU tabs when open count exceeds the limit
   - **Aggressive saving mode** — faster alarm (every 30 s) + 5-minute threshold cap
-- 🛡️ Whitelist by domain (subdomain-aware, www-safe)
-- 🔗 Whitelist by specific URL (prefix-matched, normalized)
-- 💾 RAM savings estimate (60 MB / suspended tab) shown in real time
-- 📊 Lifetime statistics (total suspended tabs + estimated RAM saved) with reset
-- 🌙 Dark / Light mode following system preference
-- 🌍 Trilingual interface — English, Português (Brasil), Español — with in-app language picker
-- 🔘 Global enable / disable toggle
+- Whitelist by domain (subdomain-aware, www-safe)
+- Whitelist by specific URL (prefix-matched, normalized)
+- RAM savings estimate (60 MB / suspended tab) shown in real time
+- Lifetime statistics (total suspended tabs + estimated RAM saved) with reset
+- Dark / Light mode following system preference
+- Trilingual interface — English, Português (Brasil), Español — with in-app language picker
+- Global enable / disable toggle
 - Quick whitelist buttons in popup for current tab (domain or URL)
 
 ### Technical
