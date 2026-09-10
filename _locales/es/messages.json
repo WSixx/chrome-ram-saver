@@ -67,5 +67,8 @@
   "wlDomainTitle": { "message": "Excluir este dominio de la suspensi\u00f3n" },
   "wlUrlTitle": { "message": "Excluir esta URL exacta de la suspensi\u00f3n" },
   "showBadge": { "message": "Mostrar contador en el icono" },
-  "showBadgeDesc": { "message": "Muestra el n\u00famero de pesta\u00f1as suspendidas directamente en el icono de la extensi\u00f3n" }
+  "showBadgeDesc": { "message": "Muestra el n\u00famero de pesta\u00f1as suspendidas directamente en el icono de la extensi\u00f3n" },
+  "excludeTab": { "message": "Pesta\u00f1a" },
+  "currentTabWhitelistedTab": { "message": "Pesta\u00f1a Inmune" },
+  "wlTabTitle": { "message": "Mantener esta pesta\u00f1a inmune a la suspensi\u00f3n en esta sesi\u00f3n" }
 }

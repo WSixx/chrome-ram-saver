@@ -100,6 +100,20 @@ describe('isTabEligible() — tab state exclusions', () => {
     expect(result.eligible).toBe(false);
     expect(result.reason).toBe('no_url');
   });
+
+  test('exempt tab is not eligible (session tab immunity)', () => {
+    const tab = makeTab();
+    const result = isTabEligible(tab, settings, inactiveAgo, NOW, false, true);
+    expect(result.eligible).toBe(false);
+    expect(result.reason).toBe('tab_exempt');
+  });
+
+  test('exempt tab is not eligible even when forceAll=true', () => {
+    const tab = makeTab();
+    const result = isTabEligible(tab, settings, inactiveAgo, NOW, true, true);
+    expect(result.eligible).toBe(false);
+    expect(result.reason).toBe('tab_exempt');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ const btnSuspendAll = document.getElementById('btn-suspend-all');
 const btnSettings   = document.getElementById('btn-settings');
 const btnWlDomain   = document.getElementById('btn-wl-domain');
 const btnWlUrl      = document.getElementById('btn-wl-url');
+const btnWlTab      = document.getElementById('btn-wl-tab');
 const currentDomain = document.getElementById('current-tab-domain');
 const currentTabRow = document.getElementById('current-tab-row');
 const toast         = document.getElementById('toast');
@@ -123,11 +124,16 @@ async function loadCurrentTab() {
       _currentNormalizedUrl === u || _currentNormalizedUrl.startsWith(u)
     );
 
+    const { [`exempt_tab_${_currentTab.id}`]: isTabExempt = false } =
+      await chrome.storage.session.get(`exempt_tab_${_currentTab.id}`);
+
     renderWlButton(btnWlDomain, isDomainWL, 'excludeDomain', 'currentTabWhitelistedDomain', 'wlDomainTitle');
     renderWlButton(btnWlUrl, isUrlWL, 'excludeUrl', 'currentTabWhitelistedUrl', 'wlUrlTitle');
+    renderWlButton(btnWlTab, isTabExempt, 'excludeTab', 'currentTabWhitelistedTab', 'wlTabTitle');
 
     btnWlDomain.dataset.action = isDomainWL ? 'remove' : 'add';
     btnWlUrl.dataset.action = isUrlWL ? 'remove' : 'add';
+    btnWlTab.dataset.action = isTabExempt ? 'remove' : 'add';
 
   } catch {
     currentTabRow.style.display = 'none';
@@ -184,6 +190,22 @@ btnWlUrl.addEventListener('click', async () => {
   showToast(btnWlUrl.dataset.action === 'add'
     ? `✓ ${shortUrl}… excluded`
     : `✓ URL removed`);
+});
+
+// ---------------------------------------------------------------------------
+// Whitelist Tab button (session immunity)
+// ---------------------------------------------------------------------------
+btnWlTab.addEventListener('click', async () => {
+  if (!_currentTab?.id) return;
+  const key = `exempt_tab_${_currentTab.id}`;
+  const isAdding = btnWlTab.dataset.action === 'add';
+  if (isAdding) {
+    await chrome.storage.session.set({ [key]: true });
+  } else {
+    await chrome.storage.session.remove(key);
+  }
+  await loadCurrentTab();
+  showToast(isAdding ? '✓ Tab protected' : '✓ Protection removed');
 });
 
 // ---------------------------------------------------------------------------

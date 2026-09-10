@@ -67,5 +67,8 @@
   "wlDomainTitle": { "message": "Exclude this domain from suspension" },
   "wlUrlTitle": { "message": "Exclude this exact URL from suspension" },
   "showBadge": { "message": "Show badge counter on icon" },
-  "showBadgeDesc": { "message": "Displays the number of currently suspended tabs on the extension icon" }
+  "showBadgeDesc": { "message": "Displays the number of currently suspended tabs on the extension icon" },
+  "excludeTab": { "message": "Tab" },
+  "currentTabWhitelistedTab": { "message": "Tab Immune" },
+  "wlTabTitle": { "message": "Keep this tab immune from suspension this session" }
 }

@@ -67,5 +67,8 @@
   "wlDomainTitle": { "message": "Excluir este dom\u00ednio da suspens\u00e3o" },
   "wlUrlTitle": { "message": "Excluir esta URL exata da suspens\u00e3o" },
   "showBadge": { "message": "Mostrar contador no \u00edcone" },
-  "showBadgeDesc": { "message": "Exibe o n\u00famero de abas suspensas diretamente no \u00edcone da extens\u00e3o" }
+  "showBadgeDesc": { "message": "Exibe o n\u00famero de abas suspensas diretamente no \u00edcone da extens\u00e3o" },
+  "excludeTab": { "message": "Aba" },
+  "currentTabWhitelistedTab": { "message": "Aba Imune" },
+  "wlTabTitle": { "message": "Manter esta aba imune \u00e0 suspens\u00e3o nesta sess\u00e3o" }
 }
