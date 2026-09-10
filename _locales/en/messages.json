@@ -28,6 +28,8 @@
   "noSuspendPinnedDesc": { "message": "Pinned tabs will always be kept active" },
   "noSuspendForms": { "message": "Don't suspend tabs with unsaved forms" },
   "noSuspendFormsDesc": { "message": "Prevents losing drafted messages, forms, or text inputs" },
+  "noSuspendGrouped": { "message": "Don't suspend tabs in groups" },
+  "noSuspendGroupedDesc": { "message": "Tabs organized into Chrome tab groups will be kept active" },
   "suspendOnMinimize": { "message": "Suspend tabs when minimizing window" },
   "suspendOnMinimizeDesc": { "message": "Suspends all eligible tabs when Chrome loses focus" },
   "languageLabel": { "message": "Language" },

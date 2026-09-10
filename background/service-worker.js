@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
   noSuspendAudio: true,
   noSuspendPinned: true,
   noSuspendForms: true,
+  noSuspendGrouped: false,
   suspendOnMinimize: false,
   // Advanced
   lazyLoadStartup: true,
@@ -61,6 +62,10 @@ function isUrlWhitelisted(url, whitelistUrls) {
 function isSystemUrl(url) {
   if (!url) return true;
   return SYSTEM_URL_PREFIXES.some(p => url.startsWith(p));
+}
+
+function isTabInGroup(tab) {
+  return typeof tab.groupId === 'number' && tab.groupId > -1;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,13 +162,14 @@ chrome.runtime.onStartup.addListener(async () => {
 
   // Discard all non-active, non-pinned, non-audible tabs on startup
   const tabs = await chrome.tabs.query({});
-  const { whitelist = [], whitelistUrls = [], noSuspendAudio = true, noSuspendPinned = true } =
-    await chrome.storage.sync.get(['whitelist', 'whitelistUrls', 'noSuspendAudio', 'noSuspendPinned']);
+  const { whitelist = [], whitelistUrls = [], noSuspendAudio = true, noSuspendPinned = true, noSuspendGrouped = false } =
+    await chrome.storage.sync.get(['whitelist', 'whitelistUrls', 'noSuspendAudio', 'noSuspendPinned', 'noSuspendGrouped']);
 
   for (const tab of tabs) {
     if (tab.active || tab.discarded) continue;
     if (noSuspendPinned && tab.pinned) continue;
     if (noSuspendAudio && tab.audible) continue;
+    if (noSuspendGrouped && isTabInGroup(tab)) continue;
     if (isSystemUrl(tab.url)) continue;
     if (isDomainWhitelisted(tab.url, whitelist)) continue;
     if (isUrlWhitelisted(tab.url, whitelistUrls)) continue;
@@ -192,8 +198,8 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   await chrome.storage.session.set({ [`tab_${tab.id}`]: Date.now() });
 
   // Active tab limit enforcement
-  const { activeTabLimit = false, activeTabLimitCount = 20, noSuspendPinned = true, noSuspendAudio = true } =
-    await chrome.storage.sync.get(['activeTabLimit', 'activeTabLimitCount', 'noSuspendPinned', 'noSuspendAudio']);
+  const { activeTabLimit = false, activeTabLimitCount = 20, noSuspendPinned = true, noSuspendAudio = true, noSuspendGrouped = false } =
+    await chrome.storage.sync.get(['activeTabLimit', 'activeTabLimitCount', 'noSuspendPinned', 'noSuspendAudio', 'noSuspendGrouped']);
 
   if (!activeTabLimit) return;
 
@@ -209,6 +215,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
     .filter(t => !t.active && !isSystemUrl(t.url) && t.url !== 'about:blank' && !exemptData[`exempt_tab_${t.id}`])
     .filter(t => !(noSuspendPinned && t.pinned))
     .filter(t => !(noSuspendAudio && t.audible))
+    .filter(t => !(noSuspendGrouped && isTabInGroup(t)))
     .sort((a, b) => {
       const aTime = activityData[`tab_${a.id}`] ?? 0;
       const bTime = activityData[`tab_${b.id}`] ?? 0;
@@ -277,6 +284,7 @@ async function suspendInactiveTabs(forceAll = false) {
     if (exemptData[`exempt_tab_${tab.id}`]) continue;
     if (settings.noSuspendPinned && tab.pinned) continue;
     if (settings.noSuspendAudio && tab.audible) continue;
+    if (settings.noSuspendGrouped && isTabInGroup(tab)) continue;
     if (isSystemUrl(tab.url)) continue;
     if (!tab.url || tab.url === 'about:blank') continue;
     if (isDomainWhitelisted(tab.url, settings.whitelist)) continue;

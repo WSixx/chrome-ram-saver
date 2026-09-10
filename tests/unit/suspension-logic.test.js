@@ -34,6 +34,7 @@ function makeSettings(overrides = {}) {
     noSuspendAudio: true,
     noSuspendPinned: true,
     noSuspendForms: true,
+    noSuspendGrouped: false,
     aggressiveMode: false,
     ...overrides,
   };
@@ -127,6 +128,28 @@ describe('isTabEligible() — tab state exclusions', () => {
     const tab = makeTab();
     const s = makeSettings({ noSuspendForms: false });
     const result = isTabEligible(tab, s, inactiveAgo, NOW, false, false, true);
+    expect(result.eligible).toBe(true);
+  });
+
+  test('tab in a group is not eligible when noSuspendGrouped=true', () => {
+    const tab = makeTab({ groupId: 42 });
+    const s = makeSettings({ noSuspendGrouped: true });
+    const result = isTabEligible(tab, s, inactiveAgo, NOW);
+    expect(result.eligible).toBe(false);
+    expect(result.reason).toBe('grouped');
+  });
+
+  test('tab in a group IS eligible when noSuspendGrouped=false', () => {
+    const tab = makeTab({ groupId: 42 });
+    const s = makeSettings({ noSuspendGrouped: false });
+    const result = isTabEligible(tab, s, inactiveAgo, NOW);
+    expect(result.eligible).toBe(true);
+  });
+
+  test('tab without a group (groupId: -1) IS eligible even when noSuspendGrouped=true', () => {
+    const tab = makeTab({ groupId: -1 });
+    const s = makeSettings({ noSuspendGrouped: true });
+    const result = isTabEligible(tab, s, inactiveAgo, NOW);
     expect(result.eligible).toBe(true);
   });
 });
