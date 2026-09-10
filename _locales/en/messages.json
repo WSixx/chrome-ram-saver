@@ -26,6 +26,8 @@
   "noSuspendAudioDesc": { "message": "Tabs playing audio or video will be excluded" },
   "noSuspendPinned": { "message": "Don't suspend pinned tabs" },
   "noSuspendPinnedDesc": { "message": "Pinned tabs will always be kept active" },
+  "noSuspendForms": { "message": "Don't suspend tabs with unsaved forms" },
+  "noSuspendFormsDesc": { "message": "Prevents losing drafted messages, forms, or text inputs" },
   "suspendOnMinimize": { "message": "Suspend tabs when minimizing window" },
   "suspendOnMinimizeDesc": { "message": "Suspends all eligible tabs when Chrome loses focus" },
   "languageLabel": { "message": "Language" },

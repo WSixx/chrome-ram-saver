@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
   // Behavior toggles
   noSuspendAudio: true,
   noSuspendPinned: true,
+  noSuspendForms: true,
   suspendOnMinimize: false,
   // Advanced
   lazyLoadStartup: true,
@@ -60,6 +61,37 @@ function isUrlWhitelisted(url, whitelistUrls) {
 function isSystemUrl(url) {
   if (!url) return true;
   return SYSTEM_URL_PREFIXES.some(p => url.startsWith(p));
+}
+
+// ---------------------------------------------------------------------------
+// Form data detection (protect unsubmitted inputs)
+// ---------------------------------------------------------------------------
+async function hasUnsavedFormData(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const inputs = document.querySelectorAll(
+          'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]), textarea'
+        );
+        for (const input of inputs) {
+          if (input.value && input.value.trim().length > 0 && input.value !== input.defaultValue) {
+            return true;
+          }
+        }
+        const editables = document.querySelectorAll('[contenteditable="true"]');
+        for (const el of editables) {
+          if (el.innerText && el.innerText.trim().length > 0) {
+            return true;
+          }
+        }
+        return false;
+      }
+    });
+    return results?.[0]?.result === true;
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -252,6 +284,10 @@ async function suspendInactiveTabs(forceAll = false) {
 
     const lastActive = activityData[`tab_${tab.id}`] ?? (now - thresholdMs - 1);
     if (forceAll || (now - lastActive) >= thresholdMs) {
+      if (settings.noSuspendForms) {
+        const hasForm = await hasUnsavedFormData(tab.id);
+        if (hasForm) continue;
+      }
       try { await chrome.tabs.discard(tab.id); newlySuspended++; } catch {}
     }
   }
