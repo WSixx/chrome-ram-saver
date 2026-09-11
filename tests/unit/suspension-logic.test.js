@@ -165,7 +165,7 @@ describe('isTabEligible() — system URL exclusions', () => {
     'chrome://extensions',
     'chrome://newtab',
     'chrome-extension://abc/popup.html',
-    'about:blank',
+    'about:newtab',
     'devtools://devtools/bundled',
     'view-source:https://example.com',
   ])('system URL "%s" is not eligible', (url) => {
