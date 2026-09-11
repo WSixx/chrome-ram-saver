@@ -74,5 +74,7 @@
   "showBadgeDesc": { "message": "Displays the number of currently suspended tabs on the extension icon" },
   "excludeTab": { "message": "Tab" },
   "currentTabWhitelistedTab": { "message": "Tab Immune" },
-  "wlTabTitle": { "message": "Keep this tab immune from suspension this session" }
+  "wlTabTitle": { "message": "Keep this tab immune from suspension this session" },
+  "markSuspendedTitle": { "message": "Show 💤 indicator on suspended tabs" },
+  "markSuspendedTitleDesc": { "message": "Prepends 💤 to the tab title in Chrome tab bar while suspended" }
 }

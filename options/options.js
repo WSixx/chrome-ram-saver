@@ -14,6 +14,7 @@ const optNoForms       = document.getElementById('opt-no-forms');
 const optNoGrouped     = document.getElementById('opt-no-grouped');
 const optSuspendMin    = document.getElementById('opt-suspend-minimize');
 const optShowBadge     = document.getElementById('opt-show-badge');
+const optMarkTitle     = document.getElementById('opt-mark-title');
 const optLang          = document.getElementById('opt-lang');
 const optLazy          = document.getElementById('opt-lazy');
 const optTabLimit      = document.getElementById('opt-tab-limit');
@@ -307,7 +308,7 @@ async function init() {
   const settings = await chrome.storage.sync.get([
     'enabled', 'thresholdMinutes', 'whitelist', 'whitelistUrls', 'userLanguage',
     'noSuspendAudio', 'noSuspendPinned', 'noSuspendForms', 'noSuspendGrouped', 'suspendOnMinimize', 'showBadge',
-    'lazyLoadStartup', 'activeTabLimit', 'activeTabLimitCount', 'aggressiveMode'
+    'markSuspendedTitle', 'lazyLoadStartup', 'activeTabLimit', 'activeTabLimitCount', 'aggressiveMode'
   ]);
 
   optEnable.checked       = settings.enabled       ?? true;
@@ -317,6 +318,7 @@ async function init() {
   optNoGrouped.checked    = settings.noSuspendGrouped ?? false;
   optSuspendMin.checked   = settings.suspendOnMinimize ?? false;
   optShowBadge.checked    = settings.showBadge         ?? true;
+  optMarkTitle.checked    = settings.markSuspendedTitle ?? true;
   optLazy.checked         = settings.lazyLoadStartup  ?? true;
   optTabLimit.checked     = settings.activeTabLimit    ?? false;
   optTabLimitCount.value  = settings.activeTabLimitCount ?? 20;
@@ -342,6 +344,7 @@ async function init() {
   makeToggle(optNoGrouped, 'noSuspendGrouped');
   makeToggle(optSuspendMin, 'suspendOnMinimize');
   makeToggle(optShowBadge, 'showBadge');
+  makeToggle(optMarkTitle, 'markSuspendedTitle');
   makeToggle(optLazy, 'lazyLoadStartup');
   makeToggle(optAggressive, 'aggressiveMode');
 

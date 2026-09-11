@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] — 2026-09-10
+
+### Added
+- Visual suspended tab indicator: automatically prepends 💤 to the tab title in Chrome's tab bar when discarded, restoring cleanly upon activation
+- Settings toggle to enable/disable the 💤 tab title indicator (`markSuspendedTitle`, enabled by default)
+- Translations in English, Português (Brasil), and Español for the title indicator setting
+
+---
+
 ## [1.5.0] — 2026-09-10
 
 ### Added
