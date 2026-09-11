@@ -40,7 +40,7 @@ Actual savings vary by tab content. There's no Chrome API that exposes per-tab m
 2. Open Chrome → `chrome://extensions`
 3. Enable **Developer Mode** (top right)
 4. Click **Load unpacked** → select this folder
-5. Done! The RAM Saver icon appears in your toolbar
+5. Done! The RAM Saver icon appears in your toolbar.
 
 ## Project Structure
 
