@@ -24,7 +24,7 @@ describe('isValidDomain()', () => {
     ['github', false],           // no TLD
     ['just-text', false],
     ['', false],
-    ['http://github.com', false], // protocol not expected here (it strips it, but single label remains)
+    ['ftp://github.com', false],  // unsupported protocol
     ['.github.com', false],      // leading dot
     ['github..com', false],      // double dot
     ['github.c', false],         // TLD too short

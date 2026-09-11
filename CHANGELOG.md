@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] — 2026-09-10
+
+### Added
+- Automated CI workflow with GitHub Actions (`.github/workflows/ci.yml`) running unit tests on all PRs and pushes to `main`
+
+---
+
 ## [1.4.0] — 2026-09-10
 
 ### Added
