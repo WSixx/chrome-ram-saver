@@ -30,8 +30,9 @@ const DEFAULT_SETTINGS = {
   activeTabLimit: false,
   activeTabLimitCount: 20,
   aggressiveMode: false,
-  // Badge
-  showBadge: true
+  // Badge & Indicators
+  showBadge: true,
+  markSuspendedTitle: true
 };
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,22 @@ async function hasUnsavedFormData(tabId) {
 }
 
 // ---------------------------------------------------------------------------
+// Tab title indicator (mark suspended tab with 💤)
+// ---------------------------------------------------------------------------
+async function markTabTitleSuspended(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        if (!document.title.startsWith('💤 ')) {
+          document.title = '💤 ' + document.title;
+        }
+      }
+    });
+  } catch {}
+}
+
+// ---------------------------------------------------------------------------
 // Badge management
 // ---------------------------------------------------------------------------
 async function updateBadge() {
@@ -162,8 +179,8 @@ chrome.runtime.onStartup.addListener(async () => {
 
   // Discard all non-active, non-pinned, non-audible tabs on startup
   const tabs = await chrome.tabs.query({});
-  const { whitelist = [], whitelistUrls = [], noSuspendAudio = true, noSuspendPinned = true, noSuspendGrouped = false } =
-    await chrome.storage.sync.get(['whitelist', 'whitelistUrls', 'noSuspendAudio', 'noSuspendPinned', 'noSuspendGrouped']);
+  const { whitelist = [], whitelistUrls = [], noSuspendAudio = true, noSuspendPinned = true, noSuspendGrouped = false, markSuspendedTitle = true } =
+    await chrome.storage.sync.get(['whitelist', 'whitelistUrls', 'noSuspendAudio', 'noSuspendPinned', 'noSuspendGrouped', 'markSuspendedTitle']);
 
   for (const tab of tabs) {
     if (tab.active || tab.discarded) continue;
@@ -173,6 +190,7 @@ chrome.runtime.onStartup.addListener(async () => {
     if (isSystemUrl(tab.url)) continue;
     if (isDomainWhitelisted(tab.url, whitelist)) continue;
     if (isUrlWhitelisted(tab.url, whitelistUrls)) continue;
+    if (markSuspendedTitle) await markTabTitleSuspended(tab.id);
     try { await chrome.tabs.discard(tab.id); } catch {}
   }
   await updateBadge();
@@ -198,8 +216,8 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   await chrome.storage.session.set({ [`tab_${tab.id}`]: Date.now() });
 
   // Active tab limit enforcement
-  const { activeTabLimit = false, activeTabLimitCount = 20, noSuspendPinned = true, noSuspendAudio = true, noSuspendGrouped = false } =
-    await chrome.storage.sync.get(['activeTabLimit', 'activeTabLimitCount', 'noSuspendPinned', 'noSuspendAudio', 'noSuspendGrouped']);
+  const { activeTabLimit = false, activeTabLimitCount = 20, noSuspendPinned = true, noSuspendAudio = true, noSuspendGrouped = false, markSuspendedTitle = true } =
+    await chrome.storage.sync.get(['activeTabLimit', 'activeTabLimitCount', 'noSuspendPinned', 'noSuspendAudio', 'noSuspendGrouped', 'markSuspendedTitle']);
 
   if (!activeTabLimit) return;
 
@@ -223,6 +241,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
     });
 
   if (eligible.length > 0) {
+    if (markSuspendedTitle) await markTabTitleSuspended(eligible[0].id);
     try { await chrome.tabs.discard(eligible[0].id); } catch {}
   }
   updateBadge();
@@ -295,6 +314,9 @@ async function suspendInactiveTabs(forceAll = false) {
       if (settings.noSuspendForms) {
         const hasForm = await hasUnsavedFormData(tab.id);
         if (hasForm) continue;
+      }
+      if (settings.markSuspendedTitle) {
+        await markTabTitleSuspended(tab.id);
       }
       try { await chrome.tabs.discard(tab.id); newlySuspended++; } catch {}
     }
