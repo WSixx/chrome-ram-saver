@@ -16,6 +16,7 @@
 - 🎵 **Smart exclusions** — tabs with audio, pinned tabs, and system pages are configurable exclusions
 - 🛡️ **Whitelist** — exclude domains or specific URLs from ever being suspended
 - 🎚️ **Flexible timer** — slider from 1 to 60 minutes of inactivity
+- 💤 **Visual indicators** — suspended tabs show a 💤 in the title and a gray "Z" favicon in Chrome's tab bar
 - 🌍 **Trilingual** — English, Português (Brasil), and Español with a language picker
 - 🌙 **Dark/Light mode** — follows your system theme automatically
 - 🔘 **Global toggle** — pause all auto-suspension without uninstalling
@@ -66,7 +67,9 @@ ram-saver/
 └── icons/
     ├── icon16.png
     ├── icon48.png
-    └── icon128.png
+    ├── icon128.png
+    ├── suspended16.png        # Gray "Z" favicon for suspended tabs
+    └── suspended32.png
 ```
 
 ## Testing
@@ -114,7 +117,8 @@ tests/
 ├── unit/
 │   ├── tab-utils.test.js     # URL utility tests (~25 cases)
 │   ├── suspension-logic.test.js  # Eligibility logic tests (~30 cases)
-│   └── validation.test.js    # Input validation tests (~20 cases)
+│   ├── validation.test.js    # Input validation tests (~20 cases)
+│   └── manifest.test.js      # Manifest structure & permissions (~15 cases)
 └── e2e/
     └── extension.test.js     # Playwright UI tests (~40 cases)
 ```
