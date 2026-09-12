@@ -101,7 +101,7 @@ async function hasUnsavedFormData(tabId) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab title indicator (mark suspended tab with 💤)
+// Tab suspended indicators (💤 title + grayscale favicon)
 // ---------------------------------------------------------------------------
 async function markTabTitleSuspended(tabId) {
   try {
@@ -113,6 +113,58 @@ async function markTabTitleSuspended(tabId) {
         }
       }
     });
+  } catch {}
+}
+
+async function grayscaleTabFavicon(tabId) {
+  try {
+    const suspendedIconUrl = chrome.runtime.getURL('icons/suspended16.png');
+    const suspendedIcon32Url = chrome.runtime.getURL('icons/suspended32.png');
+
+    // Listen for Chrome to acknowledge the favicon change
+    let timer;
+    const faviconAcknowledged = new Promise((resolve) => {
+      const onUpdate = (id, changeInfo) => {
+        if (id === tabId && changeInfo.favIconUrl) {
+          chrome.tabs.onUpdated.removeListener(onUpdate);
+          clearTimeout(timer);
+          resolve(true);
+        }
+      };
+      chrome.tabs.onUpdated.addListener(onUpdate);
+      timer = setTimeout(() => {
+        chrome.tabs.onUpdated.removeListener(onUpdate);
+        resolve(false);
+      }, 3000);
+    });
+
+    // Execute in MAIN world — Chrome's internal favicon observer
+    // only picks up DOM mutations from the page's main JS context
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      args: [suspendedIconUrl, suspendedIcon32Url],
+      func: (iconUrl, icon32Url) => {
+        document.querySelectorAll(
+          'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
+        ).forEach(el => el.remove());
+
+        const link = document.createElement('link');
+        link.rel = 'icon';
+        link.type = 'image/png';
+        link.href = iconUrl;
+        document.head.appendChild(link);
+
+        const link32 = document.createElement('link');
+        link32.rel = 'icon';
+        link32.type = 'image/png';
+        link32.sizes = '32x32';
+        link32.href = icon32Url;
+        document.head.appendChild(link32);
+      }
+    });
+
+    await faviconAcknowledged;
   } catch {}
 }
 
@@ -191,6 +243,7 @@ chrome.runtime.onStartup.addListener(async () => {
     if (isDomainWhitelisted(tab.url, whitelist)) continue;
     if (isUrlWhitelisted(tab.url, whitelistUrls)) continue;
     if (markSuspendedTitle) await markTabTitleSuspended(tab.id);
+    await grayscaleTabFavicon(tab.id);
     try { await chrome.tabs.discard(tab.id); } catch {}
   }
   await updateBadge();
@@ -242,6 +295,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
 
   if (eligible.length > 0) {
     if (markSuspendedTitle) await markTabTitleSuspended(eligible[0].id);
+    await grayscaleTabFavicon(eligible[0].id);
     try { await chrome.tabs.discard(eligible[0].id); } catch {}
   }
   updateBadge();
@@ -318,6 +372,7 @@ async function suspendInactiveTabs(forceAll = false) {
       if (settings.markSuspendedTitle) {
         await markTabTitleSuspended(tab.id);
       }
+      await grayscaleTabFavicon(tab.id);
       try { await chrome.tabs.discard(tab.id); newlySuspended++; } catch {}
     }
   }

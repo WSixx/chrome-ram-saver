@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] — 2026-09-12
+
+### Added
+- Suspended favicon indicator: replaces the tab's favicon with a gray "Z" icon when a tab is discarded, providing a clear visual cue in Chrome's tab bar
+- Static suspended icons (`icons/suspended16.png`, `icons/suspended32.png`) as web-accessible extension resources
+- `web_accessible_resources` in manifest to allow favicon injection across all pages (bypasses CSP)
+- `host_permissions: ["<all_urls>"]` in manifest — **required** for `chrome.scripting.executeScript` to function on any web page
+- Favicon change waits for Chrome acknowledgment (`chrome.tabs.onUpdated` with `favIconUrl`) before discarding, ensuring the icon persists
+- Uses `world: 'MAIN'` for script injection so Chrome's internal favicon observer detects the DOM change
+- Unit tests for manifest.json structure validation (permissions, web-accessible resources, icons)
+
+### Fixed
+- **Critical**: All `chrome.scripting.executeScript` calls (💤 title indicator, form data protection, favicon change) were silently failing because `host_permissions` was missing from the manifest. Added `host_permissions: ["<all_urls>"]` to fix
+
+---
+
 ## [1.6.0] — 2026-09-10
 
 ### Added
