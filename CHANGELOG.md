@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.10.0](https://github.com/WSixx/chrome-ram-saver/compare/v1.9.2...v1.10.0) (2026-09-13)
+
+
+### Features
+
+* **ci:** setup Google Release Please automated release management ([1289cd5](https://github.com/WSixx/chrome-ram-saver/commit/1289cd5d37649a2aee09b0fc128c67ae668a2ac7))
+* **ci:** setup Google Release Please automated release management ([e40edd3](https://github.com/WSixx/chrome-ram-saver/commit/e40edd351a2dfff96d2f502b733ac8180d1a0359))
+
+
+### Dependencies & Maintenance
+
+* **config:** include dependencies and maintenance in changelog sect… ([986ba3c](https://github.com/WSixx/chrome-ram-saver/commit/986ba3c6d23461c595bc81cc8eddf2de03e333cc))
+* **config:** include dependencies and maintenance in changelog sections ([9369d87](https://github.com/WSixx/chrome-ram-saver/commit/9369d87d95c6380feb90edb5df325221d82f4489))
+* **deps-dev:** bump jest from 29.7.0 to 30.5.1 ([964dcdb](https://github.com/WSixx/chrome-ram-saver/commit/964dcdb34db439cce5946a50fa785c34c1c57406))
+* **deps:** bump actions/cache from 4 to 6 ([ca6caaf](https://github.com/WSixx/chrome-ram-saver/commit/ca6caaf5381f7836acddc2f3e18d78e35837cef3))
+* **deps:** bump actions/checkout from 4 to 7 ([9f91633](https://github.com/WSixx/chrome-ram-saver/commit/9f9163326c8daeda4f5765b0e7f2ee3ed0b6dfa9))
+* **deps:** bump actions/checkout from 4 to 7 ([095669b](https://github.com/WSixx/chrome-ram-saver/commit/095669be2385a4424f15879ad5631513527cdf4e))
+* **deps:** bump actions/checkout from 4 to 7 ([b76c10c](https://github.com/WSixx/chrome-ram-saver/commit/b76c10c28777f8c631834b7b6ab86282b729e659))
+* **deps:** bump actions/setup-node from 4 to 7 ([f94d7fe](https://github.com/WSixx/chrome-ram-saver/commit/f94d7feab0e038bf8ffbb48e2c86d71917e815b8))
+* **deps:** bump googleapis/release-please-action from 4 to 5 ([febd101](https://github.com/WSixx/chrome-ram-saver/commit/febd10125de2b09c570d5b164d2a215bc2e59371))
+* **deps:** bump googleapis/release-please-action from 4 to 5 ([d345646](https://github.com/WSixx/chrome-ram-saver/commit/d34564651fb3ac427d67c0720d8cd5ae88bf800c))
+* **deps:** bump softprops/action-gh-release from 2 to 3 ([3e0c49f](https://github.com/WSixx/chrome-ram-saver/commit/3e0c49ffa14304787f907d06f5b4dcb1c81a2319))
+
 ## [1.9.2] — 2026-09-12
 
 ### Added
