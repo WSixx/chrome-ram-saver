@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.10.1](https://github.com/WSixx/chrome-ram-saver/compare/v1.10.0...v1.10.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* **lint:** include globals package and clean unused test variables ([41b5366](https://github.com/WSixx/chrome-ram-saver/commit/41b53661639b74aac91fae8ba1306f06de73c618))
+
+
+### Dependencies & Maintenance
+
+* **deps-dev:** migrate to ESLint 10 with Flat Config (eslint.config… ([58ca4de](https://github.com/WSixx/chrome-ram-saver/commit/58ca4deac5e1403d1efffe51feff80351989c83f))
+* **deps-dev:** migrate to ESLint 10 with Flat Config (eslint.config.mjs) ([1add34f](https://github.com/WSixx/chrome-ram-saver/commit/1add34ff26f23001df55643c0bc65a51b4c95ec6))
+* ignore environment and secret credential files ([11cc007](https://github.com/WSixx/chrome-ram-saver/commit/11cc0077825aa8d7cb8f62055ffe258663c6deeb))
+
 ## [1.10.0](https://github.com/WSixx/chrome-ram-saver/compare/v1.9.2...v1.10.0) (2026-09-13)
 
 
