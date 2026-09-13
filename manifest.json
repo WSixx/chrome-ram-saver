@@ -3,10 +3,20 @@
   "name": "__MSG_appName__",
   "short_name": "RAM Saver",
   "description": "__MSG_appDesc__",
-  "version": "1.9.2",
+  "version": "1.10.0",
   "default_locale": "en",
-  "permissions": ["tabs", "storage", "alarms", "windows", "scripting", "tabGroups", "contextMenus"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "windows",
+    "scripting",
+    "tabGroups",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "commands": {
     "suspend-current-tab": {
       "suggested_key": {
@@ -44,8 +54,15 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "web_accessible_resources": [{
-    "resources": ["icons/suspended16.png", "icons/suspended32.png"],
-    "matches": ["<all_urls>"]
-  }]
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/suspended16.png",
+        "icons/suspended32.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }
