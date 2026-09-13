@@ -43,6 +43,14 @@ jobs:
           echo "✅ Versions match: $MANIFEST_VERSION"
 
       # -----------------------------------------------------------------------
+      # 3.5 Setup Node.js
+      # -----------------------------------------------------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # -----------------------------------------------------------------------
       # 4. Package the extension (exclude dev-only files)
       # -----------------------------------------------------------------------
       - name: Package extension zip
@@ -52,6 +60,7 @@ jobs:
             --exclude "*.git*" \
             --exclude "node_modules/*" \
             --exclude "tests/*" \
+            --exclude "scripts/*" \
             --exclude "coverage/*" \
             --exclude "playwright-report/*" \
             --exclude "*.tmp*" \
@@ -70,18 +79,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Extract changelog notes
         id: changelog
-        run: |
-          # Extract the section for this version from CHANGELOG.md
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md \
-            | head -n -1 \
-            | tail -n +2)
-          # Store multi-line output
-          {
-            echo "NOTES<<EOF"
-            echo "$NOTES"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+        run: node scripts/extract-changelog.js "${{ steps.version.outputs.VERSION }}"
 
       # -----------------------------------------------------------------------
       # 6. Create GitHub Release

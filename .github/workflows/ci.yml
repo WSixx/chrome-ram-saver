@@ -67,6 +67,12 @@ jobs:
             echo "✨ New version detected: $TAG! Proceeding with auto-tag and release."
           fi
 
+      - name: Setup Node.js
+        if: steps.check_version.outputs.exists == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Package extension zip
         if: steps.check_version.outputs.exists == 'false'
         run: |
@@ -76,6 +82,7 @@ jobs:
             --exclude "*.git*" \
             --exclude "node_modules/*" \
             --exclude "tests/*" \
+            --exclude "scripts/*" \
             --exclude "coverage/*" \
             --exclude "playwright-report/*" \
             --exclude "*.tmp*" \
@@ -92,19 +99,7 @@ jobs:
       - name: Extract changelog notes
         if: steps.check_version.outputs.exists == 'false'
         id: changelog
-        run: |
-          VERSION="${{ steps.check_version.outputs.version }}"
-          NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md \
-            | head -n -1 \
-            | tail -n +2)
-          if [ -z "$NOTES" ]; then
-            NOTES="Release ${{ steps.check_version.outputs.tag }}"
-          fi
-          {
-            echo "notes<<EOF"
-            echo "$NOTES"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+        run: node scripts/extract-changelog.js "${{ steps.check_version.outputs.version }}"
 
       - name: Create Git Tag and GitHub Release
         if: steps.check_version.outputs.exists == 'false'
