@@ -47,7 +47,8 @@ jobs:
             --exclude "generate-icons.ps1" \
             --exclude "*.md" \
             --exclude "release-please-config.json" \
-            --exclude ".release-please-manifest.json"
+            --exclude ".release-please-manifest.json" \
+            --exclude "eslint.config.mjs"
           echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
           SHA256=$(sha256sum "$ZIP_NAME" | awk '{print $1}')
           echo "ZIP_SHA256=$SHA256" >> "$GITHUB_ENV"
