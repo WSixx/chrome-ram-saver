@@ -1,5 +1,0 @@
-node_modules/
-coverage/
-playwright-report/
-*.zip
-tests/.tmp-profile/
