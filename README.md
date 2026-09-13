@@ -113,6 +113,14 @@ npm run test:e2e
 
 Covers popup (toggle, timer, stats, buttons) and options page (slider, all toggles, whitelist CRUD, advanced section, stats, about).
 
+### Code Quality & Linting
+
+```bash
+npm run lint
+```
+
+Uses ESLint to catch syntax errors, undeclared variables, and code smell before pushing.
+
 ### Test structure
 
 ```
@@ -123,7 +131,9 @@ tests/
 │   ├── tab-utils.test.js     # URL utility tests (~25 cases)
 │   ├── suspension-logic.test.js  # Eligibility logic tests (~30 cases)
 │   ├── validation.test.js    # Input validation tests (~20 cases)
-│   └── manifest.test.js      # Manifest structure & permissions (~15 cases)
+│   ├── manifest.test.js      # Manifest structure & permissions (~15 cases)
+│   ├── i18n.test.js          # Trilingual parity & integrity tests (~10 cases)
+│   └── extract-changelog.test.js # Changelog extraction for releases
 └── e2e/
     └── extension.test.js     # Playwright UI tests (~40 cases)
 ```

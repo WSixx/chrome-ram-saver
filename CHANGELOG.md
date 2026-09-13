@@ -10,7 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nothing yet — be the first to contribute!
+- ESLint code quality & static analysis configured for Manifest V3 extension globals and tests (`npm run lint`)
+- Automated ESLint step added to GitHub Actions CI workflow to catch bugs and undeclared variables before merging
+- Trilingual localization parity unit test (`tests/unit/i18n.test.js`) ensuring all keys exist across `en`, `pt_BR`, and `es`
+- Robust changelog extraction script (`scripts/extract-changelog.js`) ensuring complete markdown notes in GitHub Releases
 
 ---
 
