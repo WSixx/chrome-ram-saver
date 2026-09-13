@@ -2,11 +2,12 @@
 
 > An open source Chrome extension that saves RAM by automatically suspending inactive tabs.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/WSixx/chrome-ram-saver/blob/main/LICENSE)
-[![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue.svg)](https://developer.chrome.com/docs/extensions/mv3/)
-[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-teal.svg)](https://github.com/WSixx/chrome-ram-saver)
-[![Telemetry: None](https://img.shields.io/badge/Telemetry-Zero-success.svg)](https://github.com/WSixx/chrome-ram-saver)
-[![GitHub release](https://img.shields.io/github/v/release/WSixx/chrome-ram-saver?color=teal)](https://github.com/WSixx/chrome-ram-saver/releases)
+[![CI](https://github.com/WSixx/chrome-ram-saver/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/WSixx/chrome-ram-saver/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/WSixx/chrome-ram-saver?color=2ea44f&logo=github)](https://github.com/WSixx/chrome-ram-saver/releases)
+[![Manifest V3](https://img.shields.io/badge/Chrome_MV3-Compliant-blue?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/)
+[![ESLint](https://img.shields.io/badge/Code_Quality-ESLint-4B32C3?logo=eslint&logoColor=white)](https://eslint.org/)
+[![Zero Telemetry](https://img.shields.io/badge/Telemetry-0%25_Local-brightgreen?logo=shield&logoColor=white)](https://github.com/WSixx/chrome-ram-saver#-privacy--zero-telemetry)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/WSixx/chrome-ram-saver/blob/main/LICENSE)
 
 ---
 
