@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -8,13 +8,15 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-
 jobs:
+  # ---------------------------------------------------------------------------
+  # Esteira de Testes (executada em PRs e pushes na branch main)
+  # ---------------------------------------------------------------------------
   test:
     name: Run Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -30,3 +32,95 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
+
+  # ---------------------------------------------------------------------------
+  # Criação automática de Tag & Release após sucesso dos testes na main
+  # ---------------------------------------------------------------------------
+  auto-release:
+    name: Auto Tag & Release
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version & existing tag
+        id: check_version
+        run: |
+          VERSION=$(jq -r '.version' manifest.json)
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          git fetch --tags
+          if git rev-parse --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ Tag $TAG already exists. Skipping release creation."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "✨ New version detected: $TAG! Proceeding with auto-tag and release."
+          fi
+
+      - name: Package extension zip
+        if: steps.check_version.outputs.exists == 'false'
+        run: |
+          TAG="${{ steps.check_version.outputs.tag }}"
+          ZIP_NAME="ram-saver-$TAG.zip"
+          zip -r "$ZIP_NAME" . \
+            --exclude "*.git*" \
+            --exclude "node_modules/*" \
+            --exclude "tests/*" \
+            --exclude "coverage/*" \
+            --exclude "playwright-report/*" \
+            --exclude "*.tmp*" \
+            --exclude "package.json" \
+            --exclude "package-lock.json" \
+            --exclude "jest.config.js" \
+            --exclude "playwright.config.js" \
+            --exclude "generate-icons.ps1" \
+            --exclude "*.md"
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+          echo "📦 Created $ZIP_NAME"
+          unzip -l "$ZIP_NAME"
+
+      - name: Extract changelog notes
+        if: steps.check_version.outputs.exists == 'false'
+        id: changelog
+        run: |
+          VERSION="${{ steps.check_version.outputs.version }}"
+          NOTES=$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md \
+            | head -n -1 \
+            | tail -n +2)
+          if [ -z "$NOTES" ]; then
+            NOTES="Release ${{ steps.check_version.outputs.tag }}"
+          fi
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create Git Tag and GitHub Release
+        if: steps.check_version.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.check_version.outputs.tag }}
+          name: "RAM Saver ${{ steps.check_version.outputs.tag }}"
+          body: |
+            ${{ steps.changelog.outputs.notes }}
+
+            ---
+            📦 **Installation**: Download `${{ env.ZIP_NAME }}` below and load it as an unpacked extension via `chrome://extensions` (Developer Mode).
+
+            🛒 _Chrome Web Store submission coming soon._
+          files: ${{ env.ZIP_NAME }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
