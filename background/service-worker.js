@@ -212,6 +212,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (totalSuspended === undefined) await chrome.storage.local.set({ totalSuspended: 0 });
 
   await setupAlarm();
+  setupContextMenus();
 
   const tabs = await chrome.tabs.query({});
   const now = Date.now();
@@ -225,6 +226,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 chrome.runtime.onStartup.addListener(async () => {
   await setupAlarm();
+  setupContextMenus();
 
   const { lazyLoadStartup = true } = await chrome.storage.sync.get('lazyLoadStartup');
   if (!lazyLoadStartup) return;
@@ -426,3 +428,156 @@ async function getStats() {
     totalSavedMB: totalSuspended * RAM_PER_TAB_MB
   };
 }
+
+// ---------------------------------------------------------------------------
+// Manual Tab Suspension (Context Menu & Keyboard Shortcuts)
+// ---------------------------------------------------------------------------
+async function suspendSingleTab(tab) {
+  if (!tab || !tab.id || tab.discarded || isSystemUrl(tab.url)) return;
+
+  // If tab is active in its window, switch to an adjacent tab before discarding
+  if (tab.active) {
+    const windowTabs = await chrome.tabs.query({ windowId: tab.windowId });
+    const otherTabs = windowTabs.filter(t => t.id !== tab.id);
+    if (otherTabs.length === 0) return; // Cannot discard the only tab in a window
+
+    const nextTab = otherTabs.find(t => t.index === tab.index + 1) ||
+                    otherTabs.find(t => t.index === tab.index - 1) ||
+                    otherTabs[0];
+    await chrome.tabs.update(nextTab.id, { active: true });
+  }
+
+  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  if (settings.markSuspendedTitle) {
+    await markTabTitleSuspended(tab.id);
+  }
+  await grayscaleTabFavicon(tab.id);
+
+  try {
+    await chrome.tabs.discard(tab.id);
+    const { totalSuspended = 0 } = await chrome.storage.local.get('totalSuspended');
+    await chrome.storage.local.set({ totalSuspended: totalSuspended + 1 });
+    await updateBadge();
+  } catch {}
+}
+
+async function suspendOtherTabsInWindow(windowId, activeTabId) {
+  const tabs = await chrome.tabs.query({ windowId });
+  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  const exemptData = await chrome.storage.session.get(tabs.map(t => `exempt_tab_${t.id}`));
+
+  let newlySuspended = 0;
+  for (const tab of tabs) {
+    if (tab.id === activeTabId || tab.active || tab.discarded) continue;
+    if (exemptData[`exempt_tab_${tab.id}`]) continue;
+    if (settings.noSuspendPinned && tab.pinned) continue;
+    if (settings.noSuspendAudio && tab.audible) continue;
+    if (settings.noSuspendGrouped && isTabInGroup(tab)) continue;
+    if (isSystemUrl(tab.url)) continue;
+    if (!tab.url || tab.url === 'about:blank') continue;
+    if (isDomainWhitelisted(tab.url, settings.whitelist)) continue;
+    if (isUrlWhitelisted(tab.url, settings.whitelistUrls)) continue;
+
+    if (settings.noSuspendForms) {
+      const hasForm = await hasUnsavedFormData(tab.id);
+      if (hasForm) continue;
+    }
+    if (settings.markSuspendedTitle) {
+      await markTabTitleSuspended(tab.id);
+    }
+    await grayscaleTabFavicon(tab.id);
+    try {
+      await chrome.tabs.discard(tab.id);
+      newlySuspended++;
+    } catch {}
+  }
+
+  if (newlySuspended > 0) {
+    const { totalSuspended = 0 } = await chrome.storage.local.get('totalSuspended');
+    await chrome.storage.local.set({ totalSuspended: totalSuspended + newlySuspended });
+    await updateBadge();
+  }
+}
+
+async function whitelistCurrentDomain(tab) {
+  if (!tab?.url || isSystemUrl(tab.url)) return;
+  try {
+    const hostname = new URL(tab.url).hostname.toLowerCase().replace(/^www\./, '');
+    if (!hostname) return;
+    const { whitelist = [] } = await chrome.storage.sync.get('whitelist');
+    if (!whitelist.includes(hostname)) {
+      whitelist.push(hostname);
+      await chrome.storage.sync.set({ whitelist });
+    }
+  } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// Context Menus
+// ---------------------------------------------------------------------------
+function setupContextMenus() {
+  if (!chrome.contextMenus) return;
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'ram-saver-root',
+      title: chrome.i18n.getMessage('appName') || 'RAM Saver',
+      contexts: ['page', 'action']
+    });
+
+    chrome.contextMenus.create({
+      parentId: 'ram-saver-root',
+      id: 'suspend-current-tab',
+      title: chrome.i18n.getMessage('menuSuspendCurrent') || 'Suspend this tab',
+      contexts: ['page', 'action']
+    });
+
+    chrome.contextMenus.create({
+      parentId: 'ram-saver-root',
+      id: 'suspend-other-tabs',
+      title: chrome.i18n.getMessage('menuSuspendOthers') || 'Suspend other tabs in this window',
+      contexts: ['page', 'action']
+    });
+
+    chrome.contextMenus.create({
+      parentId: 'ram-saver-root',
+      id: 'separator-1',
+      type: 'separator',
+      contexts: ['page', 'action']
+    });
+
+    chrome.contextMenus.create({
+      parentId: 'ram-saver-root',
+      id: 'whitelist-domain',
+      title: chrome.i18n.getMessage('menuWhitelistDomain') || 'Never suspend this site',
+      contexts: ['page', 'action']
+    });
+  });
+}
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'suspend-current-tab') {
+    const targetTab = tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    if (targetTab) await suspendSingleTab(targetTab);
+  } else if (info.menuItemId === 'suspend-other-tabs') {
+    const targetTab = tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    if (targetTab) await suspendOtherTabsInWindow(targetTab.windowId, targetTab.id);
+  } else if (info.menuItemId === 'whitelist-domain') {
+    const targetTab = tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    if (targetTab) await whitelistCurrentDomain(targetTab);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Keyboard Shortcuts
+// ---------------------------------------------------------------------------
+chrome.commands.onCommand.addListener(async (command) => {
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!activeTab) return;
+
+  if (command === 'suspend-current-tab') {
+    await suspendSingleTab(activeTab);
+  } else if (command === 'suspend-other-tabs') {
+    await suspendOtherTabsInWindow(activeTab.windowId, activeTab.id);
+  }
+});
+

@@ -76,5 +76,13 @@
   "currentTabWhitelistedTab": { "message": "Tab Immune" },
   "wlTabTitle": { "message": "Keep this tab immune from suspension this session" },
   "markSuspendedTitle": { "message": "Show 💤 indicator on suspended tabs" },
-  "markSuspendedTitleDesc": { "message": "Prepends 💤 to the tab title in Chrome tab bar while suspended" }
+  "markSuspendedTitleDesc": { "message": "Prepends 💤 to the tab title in Chrome tab bar while suspended" },
+  "menuSuspendCurrent": { "message": "Suspend this tab" },
+  "menuSuspendOthers": { "message": "Suspend other tabs in this window" },
+  "menuWhitelistDomain": { "message": "Never suspend this site" },
+  "cmdSuspendCurrent": { "message": "Suspend current tab" },
+  "cmdSuspendOthers": { "message": "Suspend other tabs in this window" },
+  "sectionShortcuts": { "message": "Keyboard Shortcuts" },
+  "shortcutsDesc": { "message": "Quickly suspend tabs with configurable global hotkeys." },
+  "configureShortcuts": { "message": "Configure Shortcuts in Chrome" }
 }

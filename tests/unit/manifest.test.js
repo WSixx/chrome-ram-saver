@@ -55,6 +55,10 @@ describe('manifest.json — required permissions', () => {
     expect(manifest.permissions).toContain('tabGroups');
   });
 
+  test('has contextMenus permission', () => {
+    expect(manifest.permissions).toContain('contextMenus');
+  });
+
   test('has host_permissions with <all_urls> (required for chrome.scripting.executeScript)', () => {
     expect(manifest.host_permissions).toBeDefined();
     expect(manifest.host_permissions).toContain('<all_urls>');
@@ -101,3 +105,25 @@ describe('manifest.json — icons', () => {
     expect(manifest.action.default_icon['128']).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Commands / Keyboard shortcuts
+// ---------------------------------------------------------------------------
+describe('manifest.json — commands', () => {
+  test('declares commands object', () => {
+    expect(manifest.commands).toBeDefined();
+  });
+
+  test('has suspend-current-tab command with Alt+Shift+S', () => {
+    const cmd = manifest.commands['suspend-current-tab'];
+    expect(cmd).toBeDefined();
+    expect(cmd.suggested_key.default).toBe('Alt+Shift+S');
+  });
+
+  test('has suspend-other-tabs command with Alt+Shift+O', () => {
+    const cmd = manifest.commands['suspend-other-tabs'];
+    expect(cmd).toBeDefined();
+    expect(cmd.suggested_key.default).toBe('Alt+Shift+O');
+  });
+});
+
