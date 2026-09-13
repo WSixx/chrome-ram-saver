@@ -210,6 +210,29 @@
           </div>
         </div>
 
+        <!-- Keyboard shortcuts -->
+        <div class="card">
+          <div class="field col">
+            <div class="field-info" style="margin-bottom: 12px;">
+              <label class="field-label" data-i18n="sectionShortcuts">Keyboard Shortcuts</label>
+              <p class="field-desc" data-i18n="shortcutsDesc">Quickly suspend tabs with configurable global hotkeys.</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; font-size: 13px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span data-i18n="cmdSuspendCurrent">Suspend current tab</span>
+                <kbd style="background: rgba(128,128,128,0.2); border: 1px solid rgba(128,128,128,0.3); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px;">Alt + Shift + S</kbd>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span data-i18n="cmdSuspendOthers">Suspend other tabs in this window</span>
+                <kbd style="background: rgba(128,128,128,0.2); border: 1px solid rgba(128,128,128,0.3); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px;">Alt + Shift + O</kbd>
+              </div>
+            </div>
+            <button type="button" class="btn-secondary" id="btn-configure-shortcuts" style="align-self: flex-start;" data-i18n="configureShortcuts">
+              Configure Shortcuts in Chrome
+            </button>
+          </div>
+        </div>
+
         <!-- Language -->
         <div class="card">
           <div class="field row">

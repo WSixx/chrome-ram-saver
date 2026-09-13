@@ -20,6 +20,8 @@
 - 🌍 **Trilingual** — English, Português (Brasil), and Español with a language picker
 - 🌙 **Dark/Light mode** — follows your system theme automatically
 - 🔘 **Global toggle** — pause all auto-suspension without uninstalling
+- 🖱️ **Context menu** — right-click anywhere to suspend the current tab, suspend other tabs, or whitelist the domain
+- ⌨️ **Keyboard shortcuts** — `Alt+Shift+S` to suspend current tab, `Alt+Shift+O` to suspend other tabs (fully customizable in Chrome)
 - 📌 **Suspend on minimize** — suspend tabs when Chrome loses focus
 - 🚀 **Advanced optimization** — lazy startup loading, active tab limit, and aggressive saving mode
 

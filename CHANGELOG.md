@@ -14,6 +14,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] — 2026-09-12
+
+### Added
+- Context menu (right-click) integration on web pages and toolbar extension icon:
+  - "Suspend this tab" — suspends the open tab (switches smoothly to adjacent tab before discarding if active)
+  - "Suspend other tabs in this window" — suspends all eligible background tabs in the current window
+  - "Never suspend this site" — instantly adds the current domain to the whitelist
+- Configurable global keyboard shortcuts:
+  - `Alt + Shift + S`: Suspend current tab
+  - `Alt + Shift + O`: Suspend other tabs in this window
+- Keyboard shortcuts section in the Settings page with a quick button to open `chrome://extensions/shortcuts`
+- Added `"contextMenus"` permission and `"commands"` declaration in `manifest.json`
+- Trilingual localization for all new context menu items and command descriptions (English, Português, Español)
+- Unit tests for `contextMenus` permission and `commands` structure in `manifest.test.js`
+
+---
+
 ## [1.7.0] — 2026-09-12
 
 ### Added

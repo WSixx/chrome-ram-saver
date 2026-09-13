@@ -3,10 +3,26 @@
   "name": "__MSG_appName__",
   "short_name": "RAM Saver",
   "description": "__MSG_appDesc__",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "default_locale": "en",
-  "permissions": ["tabs", "storage", "alarms", "windows", "scripting", "tabGroups"],
+  "permissions": ["tabs", "storage", "alarms", "windows", "scripting", "tabGroups", "contextMenus"],
   "host_permissions": ["<all_urls>"],
+  "commands": {
+    "suspend-current-tab": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "__MSG_cmdSuspendCurrent__"
+    },
+    "suspend-other-tabs": {
+      "suggested_key": {
+        "default": "Alt+Shift+O",
+        "mac": "Alt+Shift+O"
+      },
+      "description": "__MSG_cmdSuspendOthers__"
+    }
+  },
   "background": {
     "service_worker": "background/service-worker.js"
   },

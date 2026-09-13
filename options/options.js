@@ -350,6 +350,11 @@ async function init() {
 
   renderWhitelist(settings.whitelist ?? []);
   renderUrlWhitelist(settings.whitelistUrls ?? []);
+
+  // Configure shortcuts button
+  document.getElementById('btn-configure-shortcuts')?.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);

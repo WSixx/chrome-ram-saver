@@ -75,6 +75,14 @@
   "excludeTab": { "message": "Pesta\u00f1a" },
   "currentTabWhitelistedTab": { "message": "Pesta\u00f1a Inmune" },
   "wlTabTitle": { "message": "Mantener esta pesta\u00f1a inmune a la suspensi\u00f3n en esta sesi\u00f3n" },
-  "markSuspendedTitle": { "message": "Mostrar indicador 💤 en pesta\u00f1as suspendidas" },
-  "markSuspendedTitleDesc": { "message": "Agrega 💤 al t\u00edtulo de la pesta\u00f1a en la barra de Chrome mientras est\u00e1 suspendida" }
+  "markSuspendedTitle": { "message": "Mostrar indicador 💤 en pestañas suspendidas" },
+  "markSuspendedTitleDesc": { "message": "Agrega 💤 al título de la pestaña en la barra de Chrome mientras está suspendida" },
+  "menuSuspendCurrent": { "message": "Suspender esta pestaña" },
+  "menuSuspendOthers": { "message": "Suspender otras pestañas de esta ventana" },
+  "menuWhitelistDomain": { "message": "Nunca suspender este sitio" },
+  "cmdSuspendCurrent": { "message": "Suspender pestaña actual" },
+  "cmdSuspendOthers": { "message": "Suspender otras pestañas de esta ventana" },
+  "sectionShortcuts": { "message": "Atajos de Teclado" },
+  "shortcutsDesc": { "message": "Suspende pestañas rápidamente usando atajos globales configurables." },
+  "configureShortcuts": { "message": "Configurar Atajos en Chrome" }
 }
