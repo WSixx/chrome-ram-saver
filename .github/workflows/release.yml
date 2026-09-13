@@ -51,9 +51,9 @@ jobs:
           node-version: 20
 
       # -----------------------------------------------------------------------
-      # 4. Package the extension (exclude dev-only files)
+      # 4. Package the extension (exclude dev-only files) & Calculate SHA-256
       # -----------------------------------------------------------------------
-      - name: Package extension zip
+      - name: Package extension zip & Calculate SHA-256
         run: |
           ZIP_NAME="ram-saver-${{ github.ref_name }}.zip"
           zip -r "$ZIP_NAME" . \
@@ -71,7 +71,9 @@ jobs:
             --exclude "generate-icons.ps1" \
             --exclude "*.md"
           echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
-          echo "📦 Created $ZIP_NAME"
+          SHA256=$(sha256sum "$ZIP_NAME" | awk '{print $1}')
+          echo "ZIP_SHA256=$SHA256" >> "$GITHUB_ENV"
+          echo "📦 Created $ZIP_NAME (SHA-256: $SHA256)"
           unzip -l "$ZIP_NAME"
 
       # -----------------------------------------------------------------------
@@ -93,6 +95,8 @@ jobs:
 
             ---
             📦 **Installation**: Download `${{ env.ZIP_NAME }}` below and load it as an unpacked extension via `chrome://extensions` (Developer Mode).
+
+            🔒 **Integrity**: `sha256: ${{ env.ZIP_SHA256 }}`
 
             🛒 _Chrome Web Store submission coming soon._
           files: ${{ env.ZIP_NAME }}
