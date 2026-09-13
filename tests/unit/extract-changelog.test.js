@@ -9,7 +9,7 @@ describe('extract-changelog script', () => {
   test('extracts 1.9.0 notes including markdown bullets', () => {
     const notes = getChangelogNotes('1.9.0');
     expect(notes).toContain('Window Tabs Manager in popup');
-    expect(notes).toContain('Zero-telemetry guarantee');
+    expect(notes).toContain('zero-telemetry guarantee');
     expect(notes).not.toContain('## [1.9.0]');
     expect(notes).not.toContain('## [1.8.0]');
   });
