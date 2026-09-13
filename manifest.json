@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "short_name": "RAM Saver",
   "description": "__MSG_appDesc__",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "default_locale": "en",
   "permissions": ["tabs", "storage", "alarms", "windows", "scripting", "tabGroups", "contextMenus"],
   "host_permissions": ["<all_urls>"],

@@ -412,6 +412,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     updateBadge().then(sendResponse);
     return true;
   }
+  if (message.action === 'suspendTab') {
+    chrome.tabs.get(message.tabId)
+      .then(tab => tab ? suspendSingleTab(tab) : null)
+      .then(() => sendResponse({ ok: true }))
+      .catch(err => sendResponse({ ok: false, error: err?.message }));
+    return true;
+  }
 });
 
 // ---------------------------------------------------------------------------

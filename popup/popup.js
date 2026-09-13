@@ -17,13 +17,20 @@ const btnWlDomain   = document.getElementById('btn-wl-domain');
 const btnWlUrl      = document.getElementById('btn-wl-url');
 const btnWlTab      = document.getElementById('btn-wl-tab');
 const currentDomain = document.getElementById('current-tab-domain');
-const currentTabRow = document.getElementById('current-tab-row');
 const toast         = document.getElementById('toast');
+const tabsManagerCard   = document.getElementById('tabs-manager-card');
+const tabsManagerHeader = document.getElementById('tabs-manager-header');
+const tabsCountBadge    = document.getElementById('tabs-count-badge');
+const tabSearchInput    = document.getElementById('tab-search-input');
+const tabsList          = document.getElementById('tabs-list');
+const tabsEmpty         = document.getElementById('tabs-empty');
 
 // Current tab info (populated in loadCurrentTab)
 let _currentTab = null;
 let _currentHostname = '';
 let _currentNormalizedUrl = '';
+let _windowTabs = [];
+let _filterQuery = '';
 
 // ---------------------------------------------------------------------------
 // Animated counter
@@ -238,6 +245,7 @@ btnSuspendAll.addEventListener('click', () => {
       ? '✓ No eligible tabs'
       : `✓ ${count} tab${count === 1 ? '' : 's'} suspended`);
     loadStats();
+    loadWindowTabs();
     btnSuspendAll.querySelector('span:last-child').textContent = I18n.t('suspendAll');
     btnSuspendAll.disabled = !globalToggle.checked;
   });
@@ -261,6 +269,210 @@ function applyTimerI18n() {
 }
 
 // ---------------------------------------------------------------------------
+// Window Tabs Manager
+// ---------------------------------------------------------------------------
+function isDomainWhitelistedHelper(url, whitelist) {
+  if (!url || !whitelist?.length) return false;
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return whitelist.some(d => {
+      const dom = d.toLowerCase().trim().replace(/^www\./, '');
+      return hostname === dom || hostname.endsWith(`.${dom}`);
+    });
+  } catch { return false; }
+}
+
+function isUrlWhitelistedHelper(url, whitelistUrls) {
+  if (!url || !whitelistUrls?.length) return false;
+  const normalized = normalizeUrl(url);
+  return whitelistUrls.some(u => normalized === u || normalized.startsWith(u));
+}
+
+function isSystemUrlHelper(url) {
+  if (!url) return true;
+  return ['chrome://', 'chrome-extension://', 'edge://', 'about:', 'devtools://', 'view-source:']
+    .some(p => url.startsWith(p));
+}
+
+async function loadWindowTabs() {
+  try {
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const { whitelist = [], whitelistUrls = [] } =
+      await chrome.storage.sync.get(['whitelist', 'whitelistUrls']);
+    const exemptData = await chrome.storage.session.get(tabs.map(t => `exempt_tab_${t.id}`));
+
+    let suspendedCount = 0;
+    _windowTabs = tabs.map(tab => {
+      if (tab.discarded) suspendedCount++;
+
+      let hostname = '';
+      try { hostname = new URL(tab.url).hostname.replace(/^www\./, ''); } catch {}
+      if (!hostname) hostname = tab.url || '';
+
+      const isImmune = isDomainWhitelistedHelper(tab.url, whitelist) ||
+                       isUrlWhitelistedHelper(tab.url, whitelistUrls) ||
+                       Boolean(exemptData[`exempt_tab_${tab.id}`]) ||
+                       isSystemUrlHelper(tab.url);
+
+      let status = 'inactive';
+      let statusClass = 'pill-inactive';
+      let statusLabel = I18n.t('tabStatusInactive');
+
+      if (tab.active) {
+        status = 'active';
+        statusClass = 'pill-active';
+        statusLabel = I18n.t('tabStatusActive');
+      } else if (tab.discarded) {
+        status = 'suspended';
+        statusClass = 'pill-suspended';
+        statusLabel = I18n.t('tabStatusSuspended');
+      } else if (isImmune) {
+        status = 'immune';
+        statusClass = 'pill-immune';
+        statusLabel = I18n.t('tabStatusImmune');
+      }
+
+      return {
+        id: tab.id,
+        title: tab.title || 'Untitled',
+        url: tab.url || '',
+        favIconUrl: tab.favIconUrl,
+        active: tab.active,
+        discarded: tab.discarded,
+        hostname,
+        isImmune,
+        status,
+        statusClass,
+        statusLabel
+      };
+    });
+
+    if (tabsCountBadge) {
+      tabsCountBadge.textContent = `${tabs.length} • ${suspendedCount} 💤`;
+    }
+
+    renderTabsList();
+  } catch (err) {
+    console.error('Error loading window tabs:', err);
+  }
+}
+
+function renderTabsList() {
+  if (!tabsList) return;
+  tabsList.innerHTML = '';
+
+  const q = _filterQuery.toLowerCase();
+  const filtered = _windowTabs.filter(tab => {
+    if (!q) return true;
+    return tab.title.toLowerCase().includes(q) ||
+           tab.hostname.toLowerCase().includes(q) ||
+           tab.url.toLowerCase().includes(q);
+  });
+
+  if (filtered.length === 0) {
+    tabsEmpty?.classList.remove('hidden');
+    return;
+  }
+  tabsEmpty?.classList.add('hidden');
+
+  filtered.forEach(tab => {
+    const item = document.createElement('div');
+    item.className = tab.active ? 'tab-item active-tab' : 'tab-item';
+
+    // Click row to switch to tab
+    item.addEventListener('click', async (e) => {
+      if (e.target.closest('.btn-tab-action')) return;
+      await chrome.tabs.update(tab.id, { active: true });
+      window.close();
+    });
+
+    // Left info
+    const info = document.createElement('div');
+    info.className = 'tab-info';
+
+    const fav = document.createElement('img');
+    fav.className = 'tab-favicon';
+    fav.src = tab.favIconUrl || '../icons/icon16.png';
+    fav.onerror = () => { fav.src = '../icons/icon16.png'; };
+    info.appendChild(fav);
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'tab-text-wrap';
+
+    const title = document.createElement('span');
+    title.className = 'tab-title';
+    title.textContent = tab.title;
+    title.title = tab.title;
+    textWrap.appendChild(title);
+
+    const domain = document.createElement('span');
+    domain.className = 'tab-domain';
+    domain.textContent = tab.hostname;
+    textWrap.appendChild(domain);
+
+    info.appendChild(textWrap);
+    item.appendChild(info);
+
+    // Right meta: status pill + quick action button
+    const meta = document.createElement('div');
+    meta.className = 'tab-meta';
+
+    const pill = document.createElement('span');
+    pill.className = `tab-status-pill ${tab.statusClass}`;
+    pill.textContent = tab.statusLabel;
+    meta.appendChild(pill);
+
+    // Action button
+    if (tab.discarded) {
+      const btnWake = document.createElement('button');
+      btnWake.type = 'button';
+      btnWake.className = 'btn-tab-action';
+      btnWake.title = I18n.t('actionWake');
+      btnWake.textContent = '🔄';
+      btnWake.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await chrome.tabs.update(tab.id, { active: true });
+        window.close();
+      });
+      meta.appendChild(btnWake);
+    } else if (!tab.active && !isSystemUrlHelper(tab.url)) {
+      const btnSuspend = document.createElement('button');
+      btnSuspend.type = 'button';
+      btnSuspend.className = 'btn-tab-action';
+      btnSuspend.title = I18n.t('actionSuspend');
+      btnSuspend.textContent = '💤';
+      btnSuspend.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        btnSuspend.disabled = true;
+        btnSuspend.textContent = '⏳';
+        chrome.runtime.sendMessage({ action: 'suspendTab', tabId: tab.id }, async () => {
+          showToast('✓ Tab suspended');
+          await loadStats();
+          await loadWindowTabs();
+        });
+      });
+      meta.appendChild(btnSuspend);
+    }
+
+    item.appendChild(meta);
+    tabsList.appendChild(item);
+  });
+}
+
+// Collapsible header toggle
+tabsManagerHeader?.addEventListener('click', async () => {
+  tabsManagerCard?.classList.toggle('collapsed');
+  const isCollapsed = tabsManagerCard?.classList.contains('collapsed');
+  await chrome.storage.local.set({ popupTabsCollapsed: isCollapsed });
+});
+
+// Search filter
+tabSearchInput?.addEventListener('input', (e) => {
+  _filterQuery = e.target.value.trim();
+  renderTabsList();
+});
+
+// ---------------------------------------------------------------------------
 // Initialize
 // ---------------------------------------------------------------------------
 async function init() {
@@ -277,8 +489,15 @@ async function init() {
   const opt = timerSelect.querySelector(`option[value="${thresholdMinutes}"]`);
   if (opt) opt.selected = true;
 
+  const { popupTabsCollapsed = false } = await chrome.storage.local.get('popupTabsCollapsed');
+  if (popupTabsCollapsed) {
+    tabsManagerCard?.classList.add('collapsed');
+  }
+
   loadStats();
   loadCurrentTab();
+  loadWindowTabs();
 }
 
 document.addEventListener('DOMContentLoaded', init);
+

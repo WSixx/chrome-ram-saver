@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.0] — 2026-09-12
+
+### Added
+- Window Tabs Manager in popup: interactive drawer showing all open tabs in the current window in real time
+  - Visual status badges for every tab: 🟢 Active, 💤 Suspended, 🛡️ Immune / Whitelisted, and 🟡 Inactive
+  - Instant actions: 💤 button to suspend any background tab on demand, 🔄 button to wake/restore suspended tabs
+  - Click any tab row to smoothly switch focus to that tab in Chrome
+  - Real-time search filter to quickly find tabs by title, domain, or URL
+  - Collapsible drawer state preserved across popup sessions
+- Privacy statement & zero-telemetry guarantee documented across README and extension details (100% local, no analytics, no external servers)
+- Expanded popup width to 350px for enhanced legibility and action comfort
+- Full trilingual support for the Tab Manager in English, Português, and Español
+
+---
+
 ## [1.8.0] — 2026-09-12
 
 ### Added

@@ -84,5 +84,14 @@
   "cmdSuspendOthers": { "message": "Suspender outras abas desta janela" },
   "sectionShortcuts": { "message": "Atalhos de Teclado" },
   "shortcutsDesc": { "message": "Suspenda abas rapidamente usando atalhos globais configuráveis." },
-  "configureShortcuts": { "message": "Configurar Atalhos no Chrome" }
+  "configureShortcuts": { "message": "Configurar Atalhos no Chrome" },
+  "tabsManagerTitle": { "message": "Abas da Janela" },
+  "tabStatusActive": { "message": "Ativa" },
+  "tabStatusSuspended": { "message": "Suspensa" },
+  "tabStatusInactive": { "message": "Inativa" },
+  "tabStatusImmune": { "message": "Imune" },
+  "actionSuspend": { "message": "Suspender" },
+  "actionWake": { "message": "Ativar" },
+  "searchTabsPlaceholder": { "message": "Buscar abas…" },
+  "noTabsFound": { "message": "Nenhuma aba encontrada" }
 }

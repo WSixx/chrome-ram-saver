@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/WSixx/chrome-ram-saver/blob/main/LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue.svg)](https://developer.chrome.com/docs/extensions/mv3/)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero-teal.svg)](https://github.com/WSixx/chrome-ram-saver)
+[![Telemetry: None](https://img.shields.io/badge/Telemetry-Zero-success.svg)](https://github.com/WSixx/chrome-ram-saver)
 [![GitHub release](https://img.shields.io/github/v/release/WSixx/chrome-ram-saver?color=teal)](https://github.com/WSixx/chrome-ram-saver/releases)
 
 ---
@@ -13,6 +14,7 @@
 
 - ⚡ **Automatic suspension** — tabs inactive for a configurable time are suspended using Chrome's native `tabs.discard()` API
 - 💾 **RAM savings display** — see how much memory you've saved in real time
+- 📑 **Window tabs manager** — real-time tab drawer in popup showing active, suspended, and background tabs with instant 💤 / 🔄 actions
 - 🎵 **Smart exclusions** — tabs with audio, pinned tabs, and system pages are configurable exclusions
 - 🛡️ **Whitelist** — exclude domains or specific URLs from ever being suspended
 - 🎚️ **Flexible timer** — slider from 1 to 60 minutes of inactivity
@@ -24,6 +26,7 @@
 - ⌨️ **Keyboard shortcuts** — `Alt+Shift+S` to suspend current tab, `Alt+Shift+O` to suspend other tabs (fully customizable in Chrome)
 - 📌 **Suspend on minimize** — suspend tabs when Chrome loses focus
 - 🚀 **Advanced optimization** — lazy startup loading, active tab limit, and aggressive saving mode
+- 🔒 **100% Privacy & Zero Telemetry** — no tracking, no analytics, no external servers; everything stays local on your machine
 
 ## How it works
 
@@ -124,6 +127,18 @@ tests/
 └── e2e/
     └── extension.test.js     # Playwright UI tests (~40 cases)
 ```
+
+---
+
+## 🔒 Privacy & Zero Telemetry
+
+RAM Saver is built with a strict **privacy-first** design:
+
+- 🚫 **Zero telemetry & analytics**: We do not track, log, or collect any metrics or user behavior.
+- 🚫 **No external servers**: The extension makes **zero** outbound network requests. It never communicates with any third-party API or remote server.
+- 🚫 **No tracking or cookies**: Your browsing activity, visited URLs, and tab titles remain 100% private on your own device.
+- 💻 **100% Local**: All settings, whitelists, and counters are stored exclusively within Chrome's local storage APIs (`chrome.storage.sync` and `chrome.storage.local`).
+- 📖 **Open Source & Auditable**: Built with pure Vanilla JS and zero dependencies — fully transparent and auditable by anyone.
 
 ---
 
