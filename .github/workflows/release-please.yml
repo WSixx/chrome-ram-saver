@@ -1,0 +1,61 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # -----------------------------------------------------------------------
+      # When a release is published upon merging the Release PR:
+      # Package the extension zip and upload it as a release asset
+      # -----------------------------------------------------------------------
+      - name: Checkout code
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+
+      - name: Package extension zip & Calculate SHA-256
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          TAG="${{ steps.release.outputs.tag_name }}"
+          ZIP_NAME="ram-saver-$TAG.zip"
+          zip -r "$ZIP_NAME" . \
+            --exclude "*.git*" \
+            --exclude "node_modules/*" \
+            --exclude "tests/*" \
+            --exclude "scripts/*" \
+            --exclude "coverage/*" \
+            --exclude "playwright-report/*" \
+            --exclude "*.tmp*" \
+            --exclude "package.json" \
+            --exclude "package-lock.json" \
+            --exclude "jest.config.js" \
+            --exclude "playwright.config.js" \
+            --exclude "generate-icons.ps1" \
+            --exclude "*.md" \
+            --exclude "release-please-config.json" \
+            --exclude ".release-please-manifest.json"
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+          SHA256=$(sha256sum "$ZIP_NAME" | awk '{print $1}')
+          echo "ZIP_SHA256=$SHA256" >> "$GITHUB_ENV"
+          echo "📦 Created $ZIP_NAME (SHA-256: $SHA256)"
+
+      - name: Upload Release Asset
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ steps.release.outputs.tag_name }}" "${{ env.ZIP_NAME }}" --clobber
