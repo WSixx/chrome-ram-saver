@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Window Tabs Manager: waking up (`🔄`) or selecting a suspended tab now immediately forces Chrome to reload and restore the page, rather than only focusing the discarded tab
+- Popup UI: restored missing `currentTabRow` DOM reference, resolving `ReferenceError` that caused the whitelist action row to appear compressed with empty buttons on system pages
 
 ---
 

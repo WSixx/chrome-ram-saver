@@ -17,6 +17,7 @@ const btnWlDomain   = document.getElementById('btn-wl-domain');
 const btnWlUrl      = document.getElementById('btn-wl-url');
 const btnWlTab      = document.getElementById('btn-wl-tab');
 const currentDomain = document.getElementById('current-tab-domain');
+const currentTabRow = document.getElementById('current-tab-row');
 const toast         = document.getElementById('toast');
 const tabsManagerCard   = document.getElementById('tabs-manager-card');
 const tabsManagerHeader = document.getElementById('tabs-manager-header');
@@ -99,17 +100,30 @@ function normalizeUrl(url) {
 // Current tab — load and render whitelist buttons
 // ---------------------------------------------------------------------------
 async function loadCurrentTab() {
+  if (!currentTabRow) return;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.url) { currentTabRow.style.display = 'none'; return; }
+    if (!tab || !tab.url) {
+      currentTabRow.style.display = 'none';
+      return;
+    }
 
     let hostname = '';
     try { hostname = new URL(tab.url).hostname.replace(/^www\./, ''); } catch {}
 
-    if (!hostname || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) {
+    if (
+      !hostname ||
+      tab.url.startsWith('chrome://') ||
+      tab.url.startsWith('about:') ||
+      tab.url.startsWith('chrome-extension://') ||
+      tab.url.startsWith('edge://') ||
+      tab.url.startsWith('devtools://')
+    ) {
       currentTabRow.style.display = 'none';
       return;
     }
+
+    currentTabRow.style.display = 'flex';
 
     _currentTab = tab;
     _currentHostname = hostname;
@@ -143,7 +157,7 @@ async function loadCurrentTab() {
     btnWlTab.dataset.action = isTabExempt ? 'remove' : 'add';
 
   } catch {
-    currentTabRow.style.display = 'none';
+    if (currentTabRow) currentTabRow.style.display = 'none';
   }
 }
 
