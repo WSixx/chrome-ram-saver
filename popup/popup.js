@@ -383,6 +383,9 @@ function renderTabsList() {
     item.addEventListener('click', async (e) => {
       if (e.target.closest('.btn-tab-action')) return;
       await chrome.tabs.update(tab.id, { active: true });
+      if (tab.discarded) {
+        try { await chrome.tabs.reload(tab.id); } catch {}
+      }
       window.close();
     });
 
@@ -432,6 +435,7 @@ function renderTabsList() {
       btnWake.addEventListener('click', async (e) => {
         e.stopPropagation();
         await chrome.tabs.update(tab.id, { active: true });
+        try { await chrome.tabs.reload(tab.id); } catch {}
         window.close();
       });
       meta.appendChild(btnWake);
