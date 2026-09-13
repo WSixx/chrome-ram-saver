@@ -19,8 +19,8 @@ describe('i18n localization integrity', () => {
   });
 
   test('every key has a valid, non-empty "message" property', () => {
-    const checkMessages = (localeName, data) => {
-      for (const [key, val] of Object.entries(data)) {
+    const checkMessages = (_localeName, data) => {
+      for (const [_key, val] of Object.entries(data)) {
         expect(val).toBeDefined();
         expect(typeof val.message).toBe('string');
         expect(val.message.trim().length).toBeGreaterThan(0);

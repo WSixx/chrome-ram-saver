@@ -1,3 +1,5 @@
+import globals from "globals";
+
 export default [
   {
     ignores: [
@@ -14,48 +16,12 @@ export default [
       ecmaVersion: 2022,
       sourceType: "module",
       globals: {
-        // Browser & Web APIs
-        window: "readonly",
-        document: "readonly",
-        navigator: "readonly",
-        location: "readonly",
-        console: "readonly",
-        setTimeout: "readonly",
-        clearTimeout: "readonly",
-        setInterval: "readonly",
-        clearInterval: "readonly",
-        fetch: "readonly",
-        Image: "readonly",
-        URL: "readonly",
-        Blob: "readonly",
-        FileReader: "readonly",
-        sessionStorage: "readonly",
-        localStorage: "readonly",
-
-        // WebExtensions / Chrome API
+        ...globals.browser,
+        ...globals.node,
+        ...globals.jest,
+        ...globals.webextensions,
         chrome: "readonly",
-
-        // RAM Saver custom globals
-        I18n: "readonly",
-
-        // Node.js & CommonJS (scripts, configs, tests)
-        module: "readonly",
-        exports: "readonly",
-        require: "readonly",
-        __dirname: "readonly",
-        __filename: "readonly",
-        process: "readonly",
-
-        // Jest test runner
-        describe: "readonly",
-        test: "readonly",
-        it: "readonly",
-        expect: "readonly",
-        beforeEach: "readonly",
-        afterEach: "readonly",
-        beforeAll: "readonly",
-        afterAll: "readonly",
-        jest: "readonly"
+        I18n: "readonly"
       }
     },
     rules: {

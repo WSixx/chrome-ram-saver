@@ -3,7 +3,7 @@
 // Unit tests for user input validation used in options/options.js
 // =============================================================================
 
-const { isValidDomain, normalizeDomain, isValidUrl, normalizeUrl } = require('../helpers/utils');
+const { isValidDomain, normalizeDomain, isValidUrl } = require('../helpers/utils');
 
 // ---------------------------------------------------------------------------
 // isValidDomain
