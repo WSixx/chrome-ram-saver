@@ -1,7 +1,17 @@
+# Dependencies & Build artifacts
 node_modules/
 coverage/
 playwright-report/
 tests/.tmp-profile/
 *.zip
+
+# Operating System files
 .DS_Store
 Thumbs.db
+
+# Environment variables & Secret files
+.env
+.env.*
+*.pem
+*.key
+*.cert
