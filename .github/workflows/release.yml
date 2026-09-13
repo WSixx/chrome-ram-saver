@@ -87,7 +87,7 @@ jobs:
       # 6. Create GitHub Release
       # -----------------------------------------------------------------------
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: "RAM Saver ${{ github.ref_name }}"
           body: |
