@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.9.2] — 2026-09-12
 
 ### Added
 - ESLint code quality & static analysis configured for Manifest V3 extension globals and tests (`npm run lint`)
 - Automated ESLint step added to GitHub Actions CI workflow to catch bugs and undeclared variables before merging
 - Trilingual localization parity unit test (`tests/unit/i18n.test.js`) ensuring all keys exist across `en`, `pt_BR`, and `es`
 - Robust changelog extraction script (`scripts/extract-changelog.js`) ensuring complete markdown notes in GitHub Releases
+- GitHub Actions npm cache optimization for faster CI test runs
+- Automatic SHA-256 integrity checksum generation and attachment to GitHub Releases
+- GitHub issue templates (`bug_report.md`, `feature_request.md`), Pull Request template, and Dependabot automation
+- Modernized README header badges with official CI status, release tag, Chrome MV3, ESLint, and Zero-telemetry shields
 
 ---
 
