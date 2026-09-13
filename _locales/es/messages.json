@@ -84,5 +84,14 @@
   "cmdSuspendOthers": { "message": "Suspender otras pestañas de esta ventana" },
   "sectionShortcuts": { "message": "Atajos de Teclado" },
   "shortcutsDesc": { "message": "Suspende pestañas rápidamente usando atajos globales configurables." },
-  "configureShortcuts": { "message": "Configurar Atajos en Chrome" }
+  "configureShortcuts": { "message": "Configurar Atajos en Chrome" },
+  "tabsManagerTitle": { "message": "Pestañas de la Ventana" },
+  "tabStatusActive": { "message": "Activa" },
+  "tabStatusSuspended": { "message": "Suspendida" },
+  "tabStatusInactive": { "message": "Inactiva" },
+  "tabStatusImmune": { "message": "Inmune" },
+  "actionSuspend": { "message": "Suspender" },
+  "actionWake": { "message": "Activar" },
+  "searchTabsPlaceholder": { "message": "Buscar pestañas…" },
+  "noTabsFound": { "message": "No se encontraron pestañas" }
 }

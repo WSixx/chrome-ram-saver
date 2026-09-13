@@ -84,5 +84,14 @@
   "cmdSuspendOthers": { "message": "Suspend other tabs in this window" },
   "sectionShortcuts": { "message": "Keyboard Shortcuts" },
   "shortcutsDesc": { "message": "Quickly suspend tabs with configurable global hotkeys." },
-  "configureShortcuts": { "message": "Configure Shortcuts in Chrome" }
+  "configureShortcuts": { "message": "Configure Shortcuts in Chrome" },
+  "tabsManagerTitle": { "message": "Window Tabs" },
+  "tabStatusActive": { "message": "Active" },
+  "tabStatusSuspended": { "message": "Suspended" },
+  "tabStatusInactive": { "message": "Inactive" },
+  "tabStatusImmune": { "message": "Immune" },
+  "actionSuspend": { "message": "Suspend" },
+  "actionWake": { "message": "Wake" },
+  "searchTabsPlaceholder": { "message": "Search tabs…" },
+  "noTabsFound": { "message": "No tabs found" }
 }

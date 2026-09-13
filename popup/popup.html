@@ -93,6 +93,37 @@
       </button>
     </div>
 
+    <!-- Window Tabs Manager -->
+    <div class="tabs-manager-card" id="tabs-manager-card">
+      <div class="tabs-manager-header" id="tabs-manager-header" role="button" tabindex="0">
+        <div class="tabs-manager-title-wrap">
+          <span class="tabs-manager-icon">📑</span>
+          <span class="tabs-manager-title" data-i18n="tabsManagerTitle">Window Tabs</span>
+          <span class="tabs-count-badge" id="tabs-count-badge">0</span>
+        </div>
+        <span class="tabs-chevron" id="tabs-chevron">▲</span>
+      </div>
+
+      <div class="tabs-manager-body" id="tabs-manager-body">
+        <div class="tab-search-box">
+          <span class="tab-search-icon">🔍</span>
+          <input
+            type="text"
+            id="tab-search-input"
+            class="tab-search-input"
+            data-i18n-placeholder="searchTabsPlaceholder"
+            placeholder="Search tabs…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="tabs-list" id="tabs-list"></div>
+        <div class="tabs-empty hidden" id="tabs-empty" data-i18n="noTabsFound">
+          No tabs found
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Toast -->
