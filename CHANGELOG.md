@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.10.3](https://github.com/WSixx/chrome-ram-saver/compare/v1.10.2...v1.10.3) (2026-11-21)
+
+
+### Performance Improvements
+
+* optimize memory, performance, and MV3 service worker lifecycle ([285c7b4](https://github.com/WSixx/chrome-ram-saver/commit/285c7b477d394a1f2a31d6251f7ae89e4e4479da))
+* optimize memory, performance, and MV3 service worker lifecycle ([0930368](https://github.com/WSixx/chrome-ram-saver/commit/09303686cfcbf01cf4b721c373a5938378067c2a))
+
 ## [1.10.2](https://github.com/WSixx/chrome-ram-saver/compare/v1.10.1...v1.10.2) (2026-11-21)
 
 
