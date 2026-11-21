@@ -9,6 +9,10 @@
 [![Zero Telemetry](https://img.shields.io/badge/Telemetry-0%25_Local-brightgreen?logo=shield&logoColor=white)](https://github.com/WSixx/chrome-ram-saver#-privacy--zero-telemetry)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/WSixx/chrome-ram-saver/blob/main/LICENSE)
 
+<p align="center">
+  <img src=".github/assets/promo-tile.jpg" alt="RAM Saver — Suspend inactive tabs automatically & save Chrome memory" width="440" />
+</p>
+
 ---
 
 ## Features
