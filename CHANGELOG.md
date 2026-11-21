@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.10.2](https://github.com/WSixx/chrome-ram-saver/compare/v1.10.1...v1.10.2) (2026-11-21)
+
+
+### Bug Fixes
+
+* resolve whitelist matching, popup UI, and suspension bugs ([f7cce6d](https://github.com/WSixx/chrome-ram-saver/commit/f7cce6d934ffbdfa883b4bf460825f76da2ef575))
+
+
+### Dependencies & Maintenance
+
+* **deps-dev:** update devDependencies, lockfile, ESLint config, and CI ([bdf36e8](https://github.com/WSixx/chrome-ram-saver/commit/bdf36e833a4510e4c51eaa63d57d9feea561ff3a))
+
+
+### Documentation
+
+* add AGENTS.md, CONTRIBUTING.md, and update README ([edc0069](https://github.com/WSixx/chrome-ram-saver/commit/edc006930312f6d101f95caa1b04c8ed529f9292))
+
 ## [1.10.1](https://github.com/WSixx/chrome-ram-saver/compare/v1.10.0...v1.10.1) (2026-09-13)
 
 
