@@ -4,9 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RAM Saver</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
@@ -64,16 +61,19 @@
       <span class="current-tab-domain" id="current-tab-domain"></span>
       <div class="wl-btn-group">
         <button
+          type="button"
           class="btn-wl"
           id="btn-wl-domain"
           data-i18n-title="wlDomainTitle"
         ></button>
         <button
+          type="button"
           class="btn-wl"
           id="btn-wl-url"
           data-i18n-title="wlUrlTitle"
         ></button>
         <button
+          type="button"
           class="btn-wl"
           id="btn-wl-tab"
           data-i18n-title="wlTabTitle"
@@ -83,11 +83,11 @@
 
     <!-- Actions -->
     <div class="actions">
-      <button class="btn-primary" id="btn-suspend-all">
+      <button type="button" class="btn-primary" id="btn-suspend-all">
         <span class="btn-icon">⚡</span>
         <span data-i18n="suspendAll">Suspend All Inactive Tabs</span>
       </button>
-      <button class="btn-settings" id="btn-settings">
+      <button type="button" class="btn-settings" id="btn-settings">
         <span>⚙️</span>
         <span data-i18n="openSettings">Settings</span>
       </button>
@@ -95,7 +95,14 @@
 
     <!-- Window Tabs Manager -->
     <div class="tabs-manager-card" id="tabs-manager-card">
-      <div class="tabs-manager-header" id="tabs-manager-header" role="button" tabindex="0">
+      <div
+        class="tabs-manager-header"
+        id="tabs-manager-header"
+        role="button"
+        tabindex="0"
+        aria-expanded="true"
+        aria-controls="tabs-manager-body"
+      >
         <div class="tabs-manager-title-wrap">
           <span class="tabs-manager-icon">📑</span>
           <span class="tabs-manager-title" data-i18n="tabsManagerTitle">Window Tabs</span>
@@ -129,6 +136,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
+  <script src="../utils/shared.js"></script>
   <script src="../utils/i18n.js"></script>
   <script src="popup.js"></script>
 </body>

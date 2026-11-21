@@ -12,6 +12,7 @@
 const { test, expect, chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
+const manifest = require('../../manifest.json');
 
 const EXTENSION_PATH = path.resolve(__dirname, '../../');
 let context;
@@ -41,7 +42,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await context.close();
+  await context?.close();
 });
 
 // ---------------------------------------------------------------------------
@@ -351,6 +352,6 @@ test.describe('Options Page', () => {
     await options.locator('.nav-item[data-section="about"]').click();
     const version = options.locator('#about-version');
     await expect(version).toBeVisible();
-    await expect(version).toContainText('v1.0.0');
+    await expect(version).toContainText(`v${manifest.version}`);
   });
 });

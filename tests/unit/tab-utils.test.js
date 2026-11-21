@@ -1,14 +1,17 @@
 // =============================================================================
 // tests/unit/tab-utils.test.js
-// Unit tests for URL utility functions used in the service worker.
+// Unit tests for URL utility functions in utils/shared.js
 // =============================================================================
 
 const {
   normalizeUrl,
+  findMatchingDomain,
   isDomainWhitelisted,
+  findMatchingUrl,
   isUrlWhitelisted,
   isSystemUrl,
-} = require('../helpers/utils');
+  isTabInGroup,
+} = require('../../utils/shared');
 
 // ---------------------------------------------------------------------------
 // normalizeUrl
@@ -34,34 +37,37 @@ describe('normalizeUrl()', () => {
       .toBe('https://example.com/a/b/c');
   });
 
-  test('handles root path', () => {
-    expect(normalizeUrl('https://example.com/'))
-      .toBe('https://example.com/');
+  test('strips trailing slash consistently (root and subpaths)', () => {
+    expect(normalizeUrl('https://example.com/')).toBe('https://example.com');
+    expect(normalizeUrl('https://example.com/dashboard/')).toBe('https://example.com/dashboard');
   });
 
-  test('returns input unchanged for invalid URLs', () => {
-    expect(normalizeUrl('not-a-url')).toBe('not-a-url');
+  test('returns trimmed input for invalid URLs', () => {
+    expect(normalizeUrl('  not-a-url  ')).toBe('not-a-url');
   });
 });
 
 // ---------------------------------------------------------------------------
-// isDomainWhitelisted
+// isDomainWhitelisted & findMatchingDomain
 // ---------------------------------------------------------------------------
-describe('isDomainWhitelisted()', () => {
+describe('isDomainWhitelisted() & findMatchingDomain()', () => {
   const whitelist = ['github.com', 'google.com'];
 
   test('matches exact domain', () => {
     expect(isDomainWhitelisted('https://github.com/user/repo', whitelist)).toBe(true);
+    expect(findMatchingDomain('https://github.com/user/repo', whitelist)).toBe('github.com');
   });
 
-  test('matches subdomain', () => {
+  test('matches subdomain and returns the matched whitelist entry', () => {
     expect(isDomainWhitelisted('https://docs.github.com/en', whitelist)).toBe(true);
+    expect(findMatchingDomain('https://docs.github.com/en', whitelist)).toBe('github.com');
     expect(isDomainWhitelisted('https://mail.google.com', whitelist)).toBe(true);
   });
 
   test('strips www from whitelisted domain', () => {
     const wl = ['www.github.com'];
     expect(isDomainWhitelisted('https://github.com/page', wl)).toBe(true);
+    expect(findMatchingDomain('https://github.com/page', wl)).toBe('www.github.com');
   });
 
   test('strips www from tab URL', () => {
@@ -70,26 +76,25 @@ describe('isDomainWhitelisted()', () => {
 
   test('does not match different domain', () => {
     expect(isDomainWhitelisted('https://evil.com', whitelist)).toBe(false);
+    expect(findMatchingDomain('https://evil.com', whitelist)).toBeNull();
   });
 
   test('does not partially match domain suffix', () => {
-    // 'notgithub.com' should NOT match 'github.com'
     expect(isDomainWhitelisted('https://notgithub.com', whitelist)).toBe(false);
   });
 
-  test('returns false for empty whitelist', () => {
-    expect(isDomainWhitelisted('https://github.com', [])).toBe(false);
+  test('ignores empty strings in whitelist and URLs without hostname (file://)', () => {
+    expect(isDomainWhitelisted('file:///C:/index.html', [''])).toBe(false);
+    expect(isDomainWhitelisted('https://github.com', [''])).toBe(false);
   });
 
-  test('returns false for null whitelist', () => {
+  test('returns false for empty or null whitelist', () => {
+    expect(isDomainWhitelisted('https://github.com', [])).toBe(false);
     expect(isDomainWhitelisted('https://github.com', null)).toBe(false);
   });
 
-  test('returns false for invalid URL', () => {
+  test('returns false for invalid or empty URL', () => {
     expect(isDomainWhitelisted('not-a-url', whitelist)).toBe(false);
-  });
-
-  test('returns false for empty URL', () => {
     expect(isDomainWhitelisted('', whitelist)).toBe(false);
   });
 
@@ -100,9 +105,9 @@ describe('isDomainWhitelisted()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// isUrlWhitelisted
+// isUrlWhitelisted & findMatchingUrl
 // ---------------------------------------------------------------------------
-describe('isUrlWhitelisted()', () => {
+describe('isUrlWhitelisted() & findMatchingUrl()', () => {
   const whitelistUrls = [
     'https://app.example.com/dashboard',
     'https://tool.example.com/editor',
@@ -110,25 +115,31 @@ describe('isUrlWhitelisted()', () => {
 
   test('matches exact normalized URL', () => {
     expect(isUrlWhitelisted('https://app.example.com/dashboard', whitelistUrls)).toBe(true);
+    expect(findMatchingUrl('https://app.example.com/dashboard', whitelistUrls))
+      .toBe('https://app.example.com/dashboard');
   });
 
-  test('matches URL with query params (normalized)', () => {
+  test('matches URL with trailing slash or query/hash', () => {
+    expect(isUrlWhitelisted('https://app.example.com/dashboard/', whitelistUrls)).toBe(true);
     expect(isUrlWhitelisted('https://app.example.com/dashboard?tab=1', whitelistUrls)).toBe(true);
-  });
-
-  test('matches URL with hash (normalized)', () => {
     expect(isUrlWhitelisted('https://app.example.com/dashboard#section', whitelistUrls)).toBe(true);
   });
 
-  test('matches URL that starts with whitelisted prefix', () => {
+  test('matches sub-path at segment boundary', () => {
     expect(isUrlWhitelisted('https://app.example.com/dashboard/sub', whitelistUrls)).toBe(true);
   });
 
-  test('does not match different path', () => {
-    expect(isUrlWhitelisted('https://app.example.com/settings', whitelistUrls)).toBe(false);
+  test('does NOT false-positive on sibling path prefix (/dashboard vs /dashboard-v2)', () => {
+    expect(isUrlWhitelisted('https://app.example.com/dashboard-v2', whitelistUrls)).toBe(false);
+    expect(isUrlWhitelisted('https://app.example.com/apple', ['https://app.example.com/app'])).toBe(false);
   });
 
-  test('does not match different host', () => {
+  test('does NOT false-positive on domain spoofing (https://a.com vs https://a.com.evil.com)', () => {
+    expect(isUrlWhitelisted('https://app.example.com.evil.com/dashboard', ['https://app.example.com'])).toBe(false);
+  });
+
+  test('does not match different path or host', () => {
+    expect(isUrlWhitelisted('https://app.example.com/settings', whitelistUrls)).toBe(false);
     expect(isUrlWhitelisted('https://other.example.com/dashboard', whitelistUrls)).toBe(false);
   });
 
@@ -138,7 +149,7 @@ describe('isUrlWhitelisted()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// isSystemUrl
+// isSystemUrl & isTabInGroup
 // ---------------------------------------------------------------------------
 describe('isSystemUrl()', () => {
   test.each([
@@ -162,11 +173,21 @@ describe('isSystemUrl()', () => {
     expect(isSystemUrl(url)).toBe(expected);
   });
 
-  test('returns true for null URL', () => {
+  test('returns true for null or empty URL', () => {
     expect(isSystemUrl(null)).toBe(true);
+    expect(isSystemUrl('')).toBe(true);
+  });
+});
+
+describe('isTabInGroup()', () => {
+  test('returns true when groupId > -1', () => {
+    expect(isTabInGroup({ groupId: 0 })).toBe(true);
+    expect(isTabInGroup({ groupId: 42 })).toBe(true);
   });
 
-  test('returns true for empty string', () => {
-    expect(isSystemUrl('')).toBe(true);
+  test('returns false when groupId is -1 or missing', () => {
+    expect(isTabInGroup({ groupId: -1 })).toBe(false);
+    expect(isTabInGroup({})).toBe(false);
+    expect(isTabInGroup(null)).toBe(false);
   });
 });

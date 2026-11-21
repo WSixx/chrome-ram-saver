@@ -1,11 +1,23 @@
 // =============================================================================
 // tests/unit/i18n.test.js
-// Unit tests validating localization integrity and parity across en, pt_BR, es
+// Unit tests validating localization integrity, parity across en, pt_BR, es,
+// and verifying all HTML data-i18n* attributes exist in locale files.
 // =============================================================================
+
+const fs = require('fs');
+const path = require('path');
 
 const en = require('../../_locales/en/messages.json');
 const ptBR = require('../../_locales/pt_BR/messages.json');
 const es = require('../../_locales/es/messages.json');
+
+const ROOT_DIR = path.resolve(__dirname, '../..');
+
+function extractHtmlI18nKeys(relativePath) {
+  const html = fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
+  const matches = [...html.matchAll(/data-i18n(?:-(?:placeholder|title))?="([^"]+)"/g)];
+  return matches.map((m) => m[1]);
+}
 
 describe('i18n localization integrity', () => {
   const enKeys = Object.keys(en).sort();
@@ -32,27 +44,43 @@ describe('i18n localization integrity', () => {
   });
 
   test('pt_BR contains all keys defined in en', () => {
-    const missingInPt = enKeys.filter(k => !ptKeys.includes(k));
+    const missingInPt = enKeys.filter((k) => !ptKeys.includes(k));
     expect(missingInPt).toEqual([]);
   });
 
   test('es contains all keys defined in en', () => {
-    const missingInEs = enKeys.filter(k => !esKeys.includes(k));
+    const missingInEs = enKeys.filter((k) => !esKeys.includes(k));
     expect(missingInEs).toEqual([]);
   });
 
   test('en contains all keys defined in pt_BR (no orphan keys)', () => {
-    const orphanInPt = ptKeys.filter(k => !enKeys.includes(k));
+    const orphanInPt = ptKeys.filter((k) => !enKeys.includes(k));
     expect(orphanInPt).toEqual([]);
   });
 
   test('en contains all keys defined in es (no orphan keys)', () => {
-    const orphanInEs = esKeys.filter(k => !enKeys.includes(k));
+    const orphanInEs = esKeys.filter((k) => !enKeys.includes(k));
     expect(orphanInEs).toEqual([]);
   });
 
   test('all locales have the exact same total count of keys', () => {
     expect(ptKeys.length).toBe(enKeys.length);
     expect(esKeys.length).toBe(enKeys.length);
+  });
+
+  test('all data-i18n* keys in popup.html and options.html exist in every locale', () => {
+    const htmlKeys = [
+      ...new Set([
+        ...extractHtmlI18nKeys('popup/popup.html'),
+        ...extractHtmlI18nKeys('options/options.html'),
+      ]),
+    ];
+
+    expect(htmlKeys.length).toBeGreaterThan(0);
+    for (const key of htmlKeys) {
+      expect(en[key]?.message).toBeTruthy();
+      expect(ptBR[key]?.message).toBeTruthy();
+      expect(es[key]?.message).toBeTruthy();
+    }
   });
 });

@@ -4,9 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RAM Saver — Settings</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="options.css" />
 </head>
 <body>
@@ -213,21 +210,21 @@
         <!-- Keyboard shortcuts -->
         <div class="card">
           <div class="field col">
-            <div class="field-info" style="margin-bottom: 12px;">
+            <div class="field-info shortcuts-header">
               <label class="field-label" data-i18n="sectionShortcuts">Keyboard Shortcuts</label>
               <p class="field-desc" data-i18n="shortcutsDesc">Quickly suspend tabs with configurable global hotkeys.</p>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; font-size: 13px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="shortcuts-list">
+              <div class="shortcut-row">
                 <span data-i18n="cmdSuspendCurrent">Suspend current tab</span>
-                <kbd style="background: rgba(128,128,128,0.2); border: 1px solid rgba(128,128,128,0.3); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px;">Alt + Shift + S</kbd>
+                <kbd class="shortcut-kbd" id="shortcut-suspend-current">Alt + Shift + S</kbd>
               </div>
-              <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="shortcut-row">
                 <span data-i18n="cmdSuspendOthers">Suspend other tabs in this window</span>
-                <kbd style="background: rgba(128,128,128,0.2); border: 1px solid rgba(128,128,128,0.3); padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px;">Alt + Shift + O</kbd>
+                <kbd class="shortcut-kbd" id="shortcut-suspend-others">Alt + Shift + O</kbd>
               </div>
             </div>
-            <button type="button" class="btn-secondary" id="btn-configure-shortcuts" style="align-self: flex-start;" data-i18n="configureShortcuts">
+            <button type="button" class="btn-secondary" id="btn-configure-shortcuts" data-i18n="configureShortcuts">
               Configure Shortcuts in Chrome
             </button>
           </div>
@@ -377,11 +374,11 @@
         </div>
 
         <div class="card" style="margin-top: 16px;">
-          <p class="field-desc" style="margin-bottom: 12px;">
+          <p class="field-desc" id="stats-estimation-note" style="margin-bottom: 12px;">
             RAM savings are estimated at 60 MB per suspended tab.
             Actual savings depend on each tab's content.
           </p>
-          <button class="btn-danger" id="btn-reset-stats" data-i18n="resetStats">Reset Statistics</button>
+          <button type="button" class="btn-danger" id="btn-reset-stats" data-i18n="resetStats">Reset Statistics</button>
         </div>
       </section>
 
@@ -395,12 +392,12 @@
           <img src="../icons/icon128.png" alt="RAM Saver" class="about-icon" />
           <h3 class="about-name">RAM Saver</h3>
           <p class="about-version-text" id="about-version"></p>
-          <p class="about-desc">
+          <p class="about-desc" data-i18n="aboutDesc">
             An open source Chrome extension that saves RAM by automatically suspending
             inactive tabs using Chrome's native <code>tabs.discard()</code> API.
           </p>
           <div class="about-links">
-            <a href="https://github.com/WSixx/chrome-ram-saver" target="_blank" class="link-pill" data-i18n="aboutGithub">
+            <a href="https://github.com/WSixx/chrome-ram-saver" target="_blank" rel="noopener noreferrer" class="link-pill" data-i18n="aboutGithub">
               View on GitHub
             </a>
             <span class="link-pill muted" data-i18n="aboutLicense">License: MIT</span>
@@ -413,6 +410,7 @@
 
   <div class="toast" id="toast"></div>
 
+  <script src="../utils/shared.js"></script>
   <script src="../utils/i18n.js"></script>
   <script src="options.js"></script>
 </body>

@@ -2,6 +2,15 @@
 // RAM Saver — Popup Script
 // =============================================================================
 
+const {
+  DEFAULT_SETTINGS,
+  normalizeUrl,
+  isSystemUrl,
+  findMatchingDomain,
+  findMatchingUrl,
+  isTabImmune
+} = globalThis.RamSaverUtils;
+
 // ---------------------------------------------------------------------------
 // DOM refs
 // ---------------------------------------------------------------------------
@@ -81,19 +90,14 @@ function updateStats(stats) {
 }
 
 function loadStats() {
-  chrome.runtime.sendMessage({ action: 'getStats' }, (stats) => {
-    if (stats) updateStats(stats);
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'getStats' }, (stats) => {
+      if (!chrome.runtime.lastError && stats) {
+        updateStats(stats);
+      }
+      resolve();
+    });
   });
-}
-
-// ---------------------------------------------------------------------------
-// URL normalizer (mirror of service worker logic)
-// ---------------------------------------------------------------------------
-function normalizeUrl(url) {
-  try {
-    const u = new URL(url);
-    return `${u.origin}${u.pathname}`;
-  } catch { return url; }
 }
 
 // ---------------------------------------------------------------------------
@@ -103,22 +107,19 @@ async function loadCurrentTab() {
   if (!currentTabRow) return;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.url) {
+    if (!tab || !tab.url || isSystemUrl(tab.url)) {
       currentTabRow.style.display = 'none';
       return;
     }
 
     let hostname = '';
-    try { hostname = new URL(tab.url).hostname.replace(/^www\./, ''); } catch {}
+    try {
+      hostname = new URL(tab.url).hostname.toLowerCase().replace(/^www\./, '');
+    } catch {
+      hostname = '';
+    }
 
-    if (
-      !hostname ||
-      tab.url.startsWith('chrome://') ||
-      tab.url.startsWith('about:') ||
-      tab.url.startsWith('chrome-extension://') ||
-      tab.url.startsWith('edge://') ||
-      tab.url.startsWith('devtools://')
-    ) {
+    if (!hostname) {
       currentTabRow.style.display = 'none';
       return;
     }
@@ -134,16 +135,11 @@ async function loadCurrentTab() {
     const { whitelist = [], whitelistUrls = [] } =
       await chrome.storage.sync.get(['whitelist', 'whitelistUrls']);
 
-    // Domain button state
-    const isDomainWL = whitelist.some(d => {
-      const domain = d.toLowerCase().replace(/^www\./, '');
-      return hostname === domain || hostname.endsWith(`.${domain}`);
-    });
+    const matchedDomain = findMatchingDomain(tab.url, whitelist);
+    const isDomainWL = matchedDomain !== null;
 
-    // URL button state
-    const isUrlWL = whitelistUrls.some(u =>
-      _currentNormalizedUrl === u || _currentNormalizedUrl.startsWith(u)
-    );
+    const matchedUrl = findMatchingUrl(tab.url, whitelistUrls);
+    const isUrlWL = matchedUrl !== null;
 
     const { [`exempt_tab_${_currentTab.id}`]: isTabExempt = false } =
       await chrome.storage.session.get(`exempt_tab_${_currentTab.id}`);
@@ -153,9 +149,10 @@ async function loadCurrentTab() {
     renderWlButton(btnWlTab, isTabExempt, 'excludeTab', 'currentTabWhitelistedTab', 'wlTabTitle');
 
     btnWlDomain.dataset.action = isDomainWL ? 'remove' : 'add';
+    btnWlDomain.dataset.matchedEntry = matchedDomain || '';
     btnWlUrl.dataset.action = isUrlWL ? 'remove' : 'add';
+    btnWlUrl.dataset.matchedEntry = matchedUrl || '';
     btnWlTab.dataset.action = isTabExempt ? 'remove' : 'add';
-
   } catch {
     if (currentTabRow) currentTabRow.style.display = 'none';
   }
@@ -163,10 +160,10 @@ async function loadCurrentTab() {
 
 function renderWlButton(btn, isActive, labelKey, activeLabel, titleKey) {
   if (isActive) {
-    btn.textContent = '✓ ' + I18n.t(activeLabel);
+    btn.textContent = `✓ ${I18n.t(activeLabel)}`;
     btn.classList.add('active');
   } else {
-    btn.textContent = '+ ' + I18n.t(labelKey);
+    btn.textContent = `+ ${I18n.t(labelKey)}`;
     btn.classList.remove('active');
   }
   btn.title = I18n.t(titleKey);
@@ -177,18 +174,24 @@ function renderWlButton(btn, isActive, labelKey, activeLabel, titleKey) {
 // ---------------------------------------------------------------------------
 btnWlDomain.addEventListener('click', async () => {
   if (!_currentHostname) return;
+  const isAdding = btnWlDomain.dataset.action === 'add';
+  const targetDomain = btnWlDomain.dataset.matchedEntry || _currentHostname;
   const { whitelist = [] } = await chrome.storage.sync.get('whitelist');
+
   let updated;
-  if (btnWlDomain.dataset.action === 'add') {
-    updated = whitelist.includes(_currentHostname) ? whitelist : [...whitelist, _currentHostname];
+  if (isAdding) {
+    updated = whitelist.some((d) => d.toLowerCase() === _currentHostname)
+      ? whitelist
+      : [...whitelist, _currentHostname];
   } else {
-    updated = whitelist.filter(d => d !== _currentHostname);
+    updated = whitelist.filter((d) => d !== targetDomain && d.toLowerCase() !== _currentHostname);
   }
+
   await chrome.storage.sync.set({ whitelist: updated });
-  await loadCurrentTab();
-  showToast(btnWlDomain.dataset.action === 'add'
-    ? `✓ ${_currentHostname} excluded`
-    : `✓ ${_currentHostname} removed`);
+  await Promise.all([loadCurrentTab(), loadWindowTabs()]);
+  showToast(I18n.t(isAdding ? 'toastDomainExcluded' : 'toastDomainRemoved', {
+    domain: isAdding ? _currentHostname : targetDomain
+  }));
 });
 
 // ---------------------------------------------------------------------------
@@ -196,21 +199,25 @@ btnWlDomain.addEventListener('click', async () => {
 // ---------------------------------------------------------------------------
 btnWlUrl.addEventListener('click', async () => {
   if (!_currentNormalizedUrl) return;
+  const isAdding = btnWlUrl.dataset.action === 'add';
+  const targetUrl = btnWlUrl.dataset.matchedEntry || _currentNormalizedUrl;
   const { whitelistUrls = [] } = await chrome.storage.sync.get('whitelistUrls');
+
   let updated;
-  if (btnWlUrl.dataset.action === 'add') {
+  if (isAdding) {
     updated = whitelistUrls.includes(_currentNormalizedUrl)
       ? whitelistUrls
       : [...whitelistUrls, _currentNormalizedUrl];
   } else {
-    updated = whitelistUrls.filter(u => u !== _currentNormalizedUrl);
+    updated = whitelistUrls.filter((u) => u !== targetUrl && u !== _currentNormalizedUrl);
   }
+
   await chrome.storage.sync.set({ whitelistUrls: updated });
-  await loadCurrentTab();
+  await Promise.all([loadCurrentTab(), loadWindowTabs()]);
   const shortUrl = _currentNormalizedUrl.replace(/^https?:\/\//, '').slice(0, 30);
-  showToast(btnWlUrl.dataset.action === 'add'
-    ? `✓ ${shortUrl}… excluded`
-    : `✓ URL removed`);
+  showToast(isAdding
+    ? I18n.t('toastUrlExcluded', { url: shortUrl })
+    : I18n.t('toastUrlRemoved'));
 });
 
 // ---------------------------------------------------------------------------
@@ -225,8 +232,8 @@ btnWlTab.addEventListener('click', async () => {
   } else {
     await chrome.storage.session.remove(key);
   }
-  await loadCurrentTab();
-  showToast(isAdding ? '✓ Tab protected' : '✓ Protection removed');
+  await Promise.all([loadCurrentTab(), loadWindowTabs()]);
+  showToast(I18n.t(isAdding ? 'toastTabProtected' : 'toastProtectionRemoved'));
 });
 
 // ---------------------------------------------------------------------------
@@ -243,7 +250,7 @@ globalToggle.addEventListener('change', async () => {
 // ---------------------------------------------------------------------------
 timerSelect.addEventListener('change', async () => {
   await chrome.storage.sync.set({ thresholdMinutes: parseInt(timerSelect.value, 10) });
-  showToast('✓ Timer updated');
+  showToast(I18n.t('toastTimerUpdated'));
 });
 
 // ---------------------------------------------------------------------------
@@ -251,15 +258,18 @@ timerSelect.addEventListener('change', async () => {
 // ---------------------------------------------------------------------------
 btnSuspendAll.addEventListener('click', () => {
   btnSuspendAll.disabled = true;
-  btnSuspendAll.querySelector('span:last-child').textContent = '⏳ Suspending…';
+  btnSuspendAll.querySelector('span:last-child').textContent = I18n.t('suspendingStatus');
 
-  chrome.runtime.sendMessage({ action: 'suspendAll' }, (response) => {
-    const count = response?.suspended ?? 0;
-    showToast(count === 0
-      ? '✓ No eligible tabs'
-      : `✓ ${count} tab${count === 1 ? '' : 's'} suspended`);
-    loadStats();
-    loadWindowTabs();
+  chrome.runtime.sendMessage({ action: 'suspendAll' }, async (response) => {
+    const count = !chrome.runtime.lastError ? (response?.suspended ?? 0) : 0;
+    if (count === 0) {
+      showToast(I18n.t('toastNoEligibleTabs'));
+    } else if (count === 1) {
+      showToast(I18n.t('toastOneTabSuspended'));
+    } else {
+      showToast(I18n.t('toastManyTabsSuspended', { count }));
+    }
+    await Promise.all([loadStats(), loadWindowTabs()]);
     btnSuspendAll.querySelector('span:last-child').textContent = I18n.t('suspendAll');
     btnSuspendAll.disabled = !globalToggle.checked;
   });
@@ -276,7 +286,7 @@ btnSettings.addEventListener('click', () => {
 // Apply i18n to timer options
 // ---------------------------------------------------------------------------
 function applyTimerI18n() {
-  timerSelect.querySelectorAll('option[data-i18n]').forEach(opt => {
+  timerSelect.querySelectorAll('option[data-i18n]').forEach((opt) => {
     const v = I18n.t(opt.getAttribute('data-i18n'));
     if (v) opt.textContent = v;
   });
@@ -285,48 +295,26 @@ function applyTimerI18n() {
 // ---------------------------------------------------------------------------
 // Window Tabs Manager
 // ---------------------------------------------------------------------------
-function isDomainWhitelistedHelper(url, whitelist) {
-  if (!url || !whitelist?.length) return false;
-  try {
-    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
-    return whitelist.some(d => {
-      const dom = d.toLowerCase().trim().replace(/^www\./, '');
-      return hostname === dom || hostname.endsWith(`.${dom}`);
-    });
-  } catch { return false; }
-}
-
-function isUrlWhitelistedHelper(url, whitelistUrls) {
-  if (!url || !whitelistUrls?.length) return false;
-  const normalized = normalizeUrl(url);
-  return whitelistUrls.some(u => normalized === u || normalized.startsWith(u));
-}
-
-function isSystemUrlHelper(url) {
-  if (!url) return true;
-  return ['chrome://', 'chrome-extension://', 'edge://', 'about:', 'devtools://', 'view-source:']
-    .some(p => url.startsWith(p));
-}
-
 async function loadWindowTabs() {
   try {
     const tabs = await chrome.tabs.query({ currentWindow: true });
-    const { whitelist = [], whitelistUrls = [] } =
-      await chrome.storage.sync.get(['whitelist', 'whitelistUrls']);
-    const exemptData = await chrome.storage.session.get(tabs.map(t => `exempt_tab_${t.id}`));
+    const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+    const exemptData = await chrome.storage.session.get(tabs.map((t) => `exempt_tab_${t.id}`));
 
     let suspendedCount = 0;
-    _windowTabs = tabs.map(tab => {
+    _windowTabs = tabs.map((tab) => {
       if (tab.discarded) suspendedCount++;
 
       let hostname = '';
-      try { hostname = new URL(tab.url).hostname.replace(/^www\./, ''); } catch {}
+      try {
+        hostname = new URL(tab.url).hostname.replace(/^www\./, '');
+      } catch {
+        hostname = '';
+      }
       if (!hostname) hostname = tab.url || '';
 
-      const isImmune = isDomainWhitelistedHelper(tab.url, whitelist) ||
-                       isUrlWhitelistedHelper(tab.url, whitelistUrls) ||
-                       Boolean(exemptData[`exempt_tab_${tab.id}`]) ||
-                       isSystemUrlHelper(tab.url);
+      const isExempt = Boolean(exemptData[`exempt_tab_${tab.id}`]);
+      const immune = isTabImmune(tab, settings, isExempt);
 
       let status = 'inactive';
       let statusClass = 'pill-inactive';
@@ -340,7 +328,7 @@ async function loadWindowTabs() {
         status = 'suspended';
         statusClass = 'pill-suspended';
         statusLabel = I18n.t('tabStatusSuspended');
-      } else if (isImmune) {
+      } else if (immune) {
         status = 'immune';
         statusClass = 'pill-immune';
         statusLabel = I18n.t('tabStatusImmune');
@@ -348,13 +336,13 @@ async function loadWindowTabs() {
 
       return {
         id: tab.id,
-        title: tab.title || 'Untitled',
+        title: tab.title || I18n.t('untitledTab'),
         url: tab.url || '',
         favIconUrl: tab.favIconUrl,
         active: tab.active,
         discarded: tab.discarded,
         hostname,
-        isImmune,
+        isImmune: immune,
         status,
         statusClass,
         statusLabel
@@ -376,7 +364,7 @@ function renderTabsList() {
   tabsList.innerHTML = '';
 
   const q = _filterQuery.toLowerCase();
-  const filtered = _windowTabs.filter(tab => {
+  const filtered = _windowTabs.filter((tab) => {
     if (!q) return true;
     return tab.title.toLowerCase().includes(q) ||
            tab.hostname.toLowerCase().includes(q) ||
@@ -389,7 +377,7 @@ function renderTabsList() {
   }
   tabsEmpty?.classList.add('hidden');
 
-  filtered.forEach(tab => {
+  filtered.forEach((tab) => {
     const item = document.createElement('div');
     item.className = tab.active ? 'tab-item active-tab' : 'tab-item';
 
@@ -398,7 +386,7 @@ function renderTabsList() {
       if (e.target.closest('.btn-tab-action')) return;
       await chrome.tabs.update(tab.id, { active: true });
       if (tab.discarded) {
-        try { await chrome.tabs.reload(tab.id); } catch {}
+        try { await chrome.tabs.reload(tab.id); } catch { /* ignore */ }
       }
       window.close();
     });
@@ -445,28 +433,29 @@ function renderTabsList() {
       btnWake.type = 'button';
       btnWake.className = 'btn-tab-action';
       btnWake.title = I18n.t('actionWake');
+      btnWake.setAttribute('aria-label', I18n.t('actionWake'));
       btnWake.textContent = '🔄';
       btnWake.addEventListener('click', async (e) => {
         e.stopPropagation();
         await chrome.tabs.update(tab.id, { active: true });
-        try { await chrome.tabs.reload(tab.id); } catch {}
+        try { await chrome.tabs.reload(tab.id); } catch { /* ignore */ }
         window.close();
       });
       meta.appendChild(btnWake);
-    } else if (!tab.active && !isSystemUrlHelper(tab.url)) {
+    } else if (!tab.active && !isSystemUrl(tab.url)) {
       const btnSuspend = document.createElement('button');
       btnSuspend.type = 'button';
       btnSuspend.className = 'btn-tab-action';
       btnSuspend.title = I18n.t('actionSuspend');
+      btnSuspend.setAttribute('aria-label', I18n.t('actionSuspend'));
       btnSuspend.textContent = '💤';
-      btnSuspend.addEventListener('click', async (e) => {
+      btnSuspend.addEventListener('click', (e) => {
         e.stopPropagation();
         btnSuspend.disabled = true;
         btnSuspend.textContent = '⏳';
         chrome.runtime.sendMessage({ action: 'suspendTab', tabId: tab.id }, async () => {
-          showToast('✓ Tab suspended');
-          await loadStats();
-          await loadWindowTabs();
+          showToast(I18n.t('toastTabSuspended'));
+          await Promise.all([loadStats(), loadWindowTabs()]);
         });
       });
       meta.appendChild(btnSuspend);
@@ -477,11 +466,20 @@ function renderTabsList() {
   });
 }
 
-// Collapsible header toggle
-tabsManagerHeader?.addEventListener('click', async () => {
+async function toggleTabsManager() {
   tabsManagerCard?.classList.toggle('collapsed');
-  const isCollapsed = tabsManagerCard?.classList.contains('collapsed');
+  const isCollapsed = Boolean(tabsManagerCard?.classList.contains('collapsed'));
+  tabsManagerHeader?.setAttribute('aria-expanded', String(!isCollapsed));
   await chrome.storage.local.set({ popupTabsCollapsed: isCollapsed });
+}
+
+// Collapsible header toggle (click & keyboard)
+tabsManagerHeader?.addEventListener('click', toggleTabsManager);
+tabsManagerHeader?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleTabsManager();
+  }
 });
 
 // Search filter
@@ -504,12 +502,19 @@ async function init() {
   globalToggle.checked = enabled;
   updateStatusUI(enabled);
 
-  const opt = timerSelect.querySelector(`option[value="${thresholdMinutes}"]`);
-  if (opt) opt.selected = true;
+  let opt = timerSelect.querySelector(`option[value="${thresholdMinutes}"]`);
+  if (!opt) {
+    opt = document.createElement('option');
+    opt.value = String(thresholdMinutes);
+    opt.textContent = I18n.t('minutesShort', { min: thresholdMinutes });
+    timerSelect.appendChild(opt);
+  }
+  opt.selected = true;
 
   const { popupTabsCollapsed = false } = await chrome.storage.local.get('popupTabsCollapsed');
   if (popupTabsCollapsed) {
     tabsManagerCard?.classList.add('collapsed');
+    tabsManagerHeader?.setAttribute('aria-expanded', 'false');
   }
 
   loadStats();
@@ -518,4 +523,3 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-

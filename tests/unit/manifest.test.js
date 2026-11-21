@@ -1,9 +1,13 @@
 // =============================================================================
 // tests/unit/manifest.test.js
-// Unit tests validating the manifest.json structure and required permissions.
+// Unit tests validating manifest.json structure, permissions, and asset paths.
 // =============================================================================
 
+const fs = require('fs');
+const path = require('path');
 const manifest = require('../../manifest.json');
+
+const ROOT_DIR = path.resolve(__dirname, '../..');
 
 // ---------------------------------------------------------------------------
 // Basic manifest structure
@@ -17,17 +21,20 @@ describe('manifest.json — basic structure', () => {
     expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  test('defines a service worker background', () => {
+  test('defines a service worker background that exists on disk', () => {
     expect(manifest.background).toBeDefined();
     expect(manifest.background.service_worker).toBe('background/service-worker.js');
+    expect(fs.existsSync(path.join(ROOT_DIR, manifest.background.service_worker))).toBe(true);
   });
 
-  test('defines a default popup', () => {
+  test('defines a default popup that exists on disk', () => {
     expect(manifest.action.default_popup).toBe('popup/popup.html');
+    expect(fs.existsSync(path.join(ROOT_DIR, manifest.action.default_popup))).toBe(true);
   });
 
-  test('defines an options page', () => {
+  test('defines an options page that exists on disk', () => {
     expect(manifest.options_ui.page).toBe('options/options.html');
+    expect(fs.existsSync(path.join(ROOT_DIR, manifest.options_ui.page))).toBe(true);
   });
 });
 
@@ -35,28 +42,15 @@ describe('manifest.json — basic structure', () => {
 // Required permissions
 // ---------------------------------------------------------------------------
 describe('manifest.json — required permissions', () => {
-  test('has tabs permission', () => {
-    expect(manifest.permissions).toContain('tabs');
-  });
+  test.each(['tabs', 'storage', 'alarms', 'scripting', 'tabGroups', 'contextMenus'])(
+    'has %s permission',
+    (perm) => {
+      expect(manifest.permissions).toContain(perm);
+    }
+  );
 
-  test('has storage permission', () => {
-    expect(manifest.permissions).toContain('storage');
-  });
-
-  test('has alarms permission', () => {
-    expect(manifest.permissions).toContain('alarms');
-  });
-
-  test('has scripting permission', () => {
-    expect(manifest.permissions).toContain('scripting');
-  });
-
-  test('has tabGroups permission', () => {
-    expect(manifest.permissions).toContain('tabGroups');
-  });
-
-  test('has contextMenus permission', () => {
-    expect(manifest.permissions).toContain('contextMenus');
+  test('does NOT declare invalid MV3 "windows" permission', () => {
+    expect(manifest.permissions).not.toContain('windows');
   });
 
   test('has host_permissions with <all_urls> (required for chrome.scripting.executeScript)', () => {
@@ -75,16 +69,18 @@ describe('manifest.json — web accessible resources', () => {
     expect(manifest.web_accessible_resources.length).toBeGreaterThan(0);
   });
 
-  test('suspended icons are declared as web-accessible', () => {
-    const resources = manifest.web_accessible_resources
-      .flatMap(entry => entry.resources);
+  test('suspended icons are declared as web-accessible and exist on disk', () => {
+    const resources = manifest.web_accessible_resources.flatMap((entry) => entry.resources);
     expect(resources).toContain('icons/suspended16.png');
     expect(resources).toContain('icons/suspended32.png');
+    for (const res of resources) {
+      expect(fs.existsSync(path.join(ROOT_DIR, res))).toBe(true);
+    }
   });
 
   test('web-accessible resources match all URLs', () => {
     const matchesAll = manifest.web_accessible_resources
-      .some(entry => entry.matches.includes('<all_urls>'));
+      .some((entry) => entry.matches.includes('<all_urls>'));
     expect(matchesAll).toBe(true);
   });
 });
@@ -93,16 +89,18 @@ describe('manifest.json — web accessible resources', () => {
 // Icons
 // ---------------------------------------------------------------------------
 describe('manifest.json — icons', () => {
-  test('declares icons at 16, 48, 128 sizes', () => {
-    expect(manifest.icons['16']).toBeDefined();
-    expect(manifest.icons['48']).toBeDefined();
-    expect(manifest.icons['128']).toBeDefined();
+  test('declares icons at 16, 48, 128 sizes and all files exist on disk', () => {
+    for (const size of ['16', '48', '128']) {
+      expect(manifest.icons[size]).toBeDefined();
+      expect(fs.existsSync(path.join(ROOT_DIR, manifest.icons[size]))).toBe(true);
+    }
   });
 
-  test('action declares default icons', () => {
-    expect(manifest.action.default_icon['16']).toBeDefined();
-    expect(manifest.action.default_icon['48']).toBeDefined();
-    expect(manifest.action.default_icon['128']).toBeDefined();
+  test('action declares default icons and all files exist on disk', () => {
+    for (const size of ['16', '48', '128']) {
+      expect(manifest.action.default_icon[size]).toBeDefined();
+      expect(fs.existsSync(path.join(ROOT_DIR, manifest.action.default_icon[size]))).toBe(true);
+    }
   });
 });
 
@@ -126,4 +124,3 @@ describe('manifest.json — commands', () => {
     expect(cmd.suggested_key.default).toBe('Alt+Shift+O');
   });
 });
-

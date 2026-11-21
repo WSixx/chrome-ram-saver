@@ -22,9 +22,14 @@
         } else {
           lang = SUPPORTED.includes(userLanguage) ? userLanguage : 'en';
         }
-      } catch { lang = 'en'; }
+      } catch {
+        lang = 'en';
+      }
 
       this._lang = lang;
+      if (typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.lang = lang === 'pt_BR' ? 'pt-BR' : lang;
+      }
 
       try {
         const url = chrome.runtime.getURL(`_locales/${lang}/messages.json`);
@@ -35,24 +40,32 @@
           const url = chrome.runtime.getURL('_locales/en/messages.json');
           const resp = await fetch(url);
           this._messages = await resp.json();
-        } catch { this._messages = {}; }
+        } catch {
+          this._messages = {};
+        }
       }
     },
 
-    t(key) {
-      return this._messages[key]?.message ?? chrome.i18n.getMessage(key) ?? key;
+    t(key, vars) {
+      let str = this._messages[key]?.message || chrome.i18n.getMessage(key) || key;
+      if (vars && typeof str === 'string') {
+        for (const [k, v] of Object.entries(vars)) {
+          str = str.replaceAll(`{${k}}`, String(v));
+        }
+      }
+      return str;
     },
 
     apply() {
-      document.querySelectorAll('[data-i18n]').forEach(el => {
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
         const v = this.t(el.getAttribute('data-i18n'));
         if (v) el.textContent = v;
       });
-      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
         const v = this.t(el.getAttribute('data-i18n-placeholder'));
         if (v) el.placeholder = v;
       });
-      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      document.querySelectorAll('[data-i18n-title]').forEach((el) => {
         const v = this.t(el.getAttribute('data-i18n-title'));
         if (v) el.title = v;
       });

@@ -2,41 +2,53 @@
 // RAM Saver — Options Page Script
 // =============================================================================
 
+const {
+  DEFAULT_SETTINGS,
+  RAM_PER_TAB_MB,
+  isValidDomain,
+  normalizeDomain,
+  isValidUrl,
+  normalizeUrl
+} = globalThis.RamSaverUtils;
+
 // ---------------------------------------------------------------------------
 // DOM refs
 // ---------------------------------------------------------------------------
-const optEnable        = document.getElementById('opt-enable');
-const optTimer         = document.getElementById('opt-timer');
-const timerDisplay     = document.getElementById('timer-display');
-const optNoAudio       = document.getElementById('opt-no-audio');
-const optNoPinned      = document.getElementById('opt-no-pinned');
-const optNoForms       = document.getElementById('opt-no-forms');
-const optNoGrouped     = document.getElementById('opt-no-grouped');
-const optSuspendMin    = document.getElementById('opt-suspend-minimize');
-const optShowBadge     = document.getElementById('opt-show-badge');
-const optMarkTitle     = document.getElementById('opt-mark-title');
-const optLang          = document.getElementById('opt-lang');
-const optLazy          = document.getElementById('opt-lazy');
-const optTabLimit      = document.getElementById('opt-tab-limit');
-const optTabLimitCount = document.getElementById('opt-tab-limit-count');
-const tabLimitControl  = document.getElementById('tab-limit-control');
-const optAggressive    = document.getElementById('opt-aggressive');
-const domainInput      = document.getElementById('domain-input');
-const btnAddDomain     = document.getElementById('btn-add-domain');
-const domainError      = document.getElementById('domain-error');
-const whitelistList    = document.getElementById('whitelist-list');
-const whitelistEmpty   = document.getElementById('whitelist-empty');
-const urlInput         = document.getElementById('url-input');
-const btnAddUrl        = document.getElementById('btn-add-url');
-const urlError         = document.getElementById('url-error');
-const whitelistUrlList = document.getElementById('whitelist-url-list');
-const whitelistUrlEmp  = document.getElementById('whitelist-url-empty');
-const statTotalTabs    = document.getElementById('stat-total-tabs');
-const statTotalMb      = document.getElementById('stat-total-mb');
-const btnResetStats    = document.getElementById('btn-reset-stats');
-const brandVersion     = document.getElementById('brand-version');
-const aboutVersion     = document.getElementById('about-version');
-const toast            = document.getElementById('toast');
+const optEnable              = document.getElementById('opt-enable');
+const optTimer               = document.getElementById('opt-timer');
+const timerDisplay           = document.getElementById('timer-display');
+const optNoAudio             = document.getElementById('opt-no-audio');
+const optNoPinned            = document.getElementById('opt-no-pinned');
+const optNoForms             = document.getElementById('opt-no-forms');
+const optNoGrouped           = document.getElementById('opt-no-grouped');
+const optSuspendMin          = document.getElementById('opt-suspend-minimize');
+const optShowBadge           = document.getElementById('opt-show-badge');
+const optMarkTitle           = document.getElementById('opt-mark-title');
+const optLang                = document.getElementById('opt-lang');
+const optLazy                = document.getElementById('opt-lazy');
+const optTabLimit            = document.getElementById('opt-tab-limit');
+const optTabLimitCount       = document.getElementById('opt-tab-limit-count');
+const tabLimitControl        = document.getElementById('tab-limit-control');
+const optAggressive          = document.getElementById('opt-aggressive');
+const domainInput            = document.getElementById('domain-input');
+const btnAddDomain           = document.getElementById('btn-add-domain');
+const domainError            = document.getElementById('domain-error');
+const whitelistList          = document.getElementById('whitelist-list');
+const whitelistEmpty         = document.getElementById('whitelist-empty');
+const urlInput               = document.getElementById('url-input');
+const btnAddUrl              = document.getElementById('btn-add-url');
+const urlError               = document.getElementById('url-error');
+const whitelistUrlList       = document.getElementById('whitelist-url-list');
+const whitelistUrlEmp        = document.getElementById('whitelist-url-empty');
+const statTotalTabs          = document.getElementById('stat-total-tabs');
+const statTotalMb            = document.getElementById('stat-total-mb');
+const statsEstimationNote    = document.getElementById('stats-estimation-note');
+const btnResetStats          = document.getElementById('btn-reset-stats');
+const brandVersion           = document.getElementById('brand-version');
+const aboutVersion           = document.getElementById('about-version');
+const shortcutSuspendCurrent = document.getElementById('shortcut-suspend-current');
+const shortcutSuspendOthers  = document.getElementById('shortcut-suspend-others');
+const toast                  = document.getElementById('toast');
 
 // ---------------------------------------------------------------------------
 // Toast
@@ -55,14 +67,17 @@ function showToast(msg, duration = 2500) {
 const navItems = document.querySelectorAll('.nav-item');
 const sections = document.querySelectorAll('.section');
 
-function showSection(id) {
-  sections.forEach(s => s.classList.toggle('hidden', s.id !== id));
-  navItems.forEach(n => n.classList.toggle('active', n.dataset.section === id));
+function showSection(id, updateHash = true) {
+  sections.forEach((s) => s.classList.toggle('hidden', s.id !== id));
+  navItems.forEach((n) => n.classList.toggle('active', n.dataset.section === id));
+  if (updateHash && window.location.hash !== `#${id}`) {
+    history.replaceState(null, '', `#${id}`);
+  }
   if (id === 'stats') loadStats();
 }
 
-navItems.forEach(item => {
-  item.addEventListener('click', e => {
+navItems.forEach((item) => {
+  item.addEventListener('click', (e) => {
     e.preventDefault();
     showSection(item.dataset.section);
   });
@@ -70,7 +85,7 @@ navItems.forEach(item => {
 
 function handleHash() {
   const id = window.location.hash.replace('#', '') || 'general';
-  if (document.getElementById(id)) showSection(id);
+  if (document.getElementById(id)) showSection(id, false);
 }
 window.addEventListener('hashchange', handleHash);
 
@@ -82,7 +97,7 @@ function updateSlider(val) {
   const max = parseInt(optTimer.max, 10);
   const pct = ((val - min) / (max - min)) * 100;
   optTimer.style.setProperty('--fill', `${pct}%`);
-  timerDisplay.textContent = `${val} min`;
+  timerDisplay.textContent = I18n.t('minutesShort', { min: val });
 }
 
 optTimer.addEventListener('input', () => {
@@ -92,94 +107,88 @@ optTimer.addEventListener('input', () => {
 
 optTimer.addEventListener('change', async () => {
   await chrome.storage.sync.set({ thresholdMinutes: parseInt(optTimer.value, 10) });
-  showToast('✓ Timer updated');
+  showToast(I18n.t('toastTimerUpdated'));
 });
 
 // ---------------------------------------------------------------------------
 // Apply i18n to select options
 // ---------------------------------------------------------------------------
 function applySelectI18n(selectEl) {
-  selectEl.querySelectorAll('option[data-i18n]').forEach(opt => {
-    const v = I18n.t(opt.getAttribute('data-i18n'));
-    if (v && v !== opt.getAttribute('data-i18n')) opt.textContent = v;
+  selectEl.querySelectorAll('option[data-i18n]').forEach((opt) => {
+    const key = opt.getAttribute('data-i18n');
+    const v = I18n.t(key);
+    if (v && v !== key) opt.textContent = v;
   });
 }
 
 // ---------------------------------------------------------------------------
-// Validation helpers
-// ---------------------------------------------------------------------------
-function isValidDomain(d) {
-  const clean = d.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
-  return /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/.test(clean);
-}
-
-function normalizeDomain(d) {
-  return d.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
-}
-
-function isValidUrl(u) {
-  try {
-    const p = new URL(u.trim());
-    return p.protocol === 'https:' || p.protocol === 'http:';
-  } catch { return false; }
-}
-
-function normalizeUrl(u) {
-  try {
-    const p = new URL(u.trim());
-    return `${p.origin}${p.pathname}`.replace(/\/$/, '');
-  } catch { return u.trim(); }
-}
-
-function escHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// ---------------------------------------------------------------------------
-// Render: domain whitelist
+// Render: domain whitelist (safe DOM construction)
 // ---------------------------------------------------------------------------
 function renderWhitelist(list) {
   whitelistList.innerHTML = '';
   if (!list?.length) { whitelistEmpty.classList.remove('hidden'); return; }
   whitelistEmpty.classList.add('hidden');
-  list.forEach(domain => {
+
+  list.forEach((domain) => {
     const li = document.createElement('li');
     li.className = 'whitelist-item';
-    li.innerHTML = `<span class="whitelist-domain">${escHtml(domain)}</span>
-      <button class="btn-remove" data-domain="${escHtml(domain)}">✕</button>`;
-    li.querySelector('.btn-remove').addEventListener('click', async () => {
+
+    const span = document.createElement('span');
+    span.className = 'whitelist-domain';
+    span.textContent = domain;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-remove';
+    btn.textContent = '✕';
+    btn.setAttribute('aria-label', I18n.t('removeItemLabel', { item: domain }));
+    btn.addEventListener('click', async () => {
       const { whitelist: wl = [] } = await chrome.storage.sync.get('whitelist');
-      const updated = wl.filter(d => d !== domain);
+      const updated = wl.filter((d) => d !== domain);
       await chrome.storage.sync.set({ whitelist: updated });
       renderWhitelist(updated);
-      showToast(`✓ ${domain} removed`);
+      showToast(I18n.t('toastDomainRemoved', { domain }));
     });
+
+    li.appendChild(span);
+    li.appendChild(btn);
     whitelistList.appendChild(li);
   });
 }
 
 // ---------------------------------------------------------------------------
-// Render: URL whitelist
+// Render: URL whitelist (safe DOM construction)
 // ---------------------------------------------------------------------------
 function renderUrlWhitelist(urls) {
   whitelistUrlList.innerHTML = '';
   if (!urls?.length) { whitelistUrlEmp.classList.remove('hidden'); return; }
   whitelistUrlEmp.classList.add('hidden');
-  urls.forEach(url => {
+
+  urls.forEach((url) => {
     const display = url.replace(/^https?:\/\//, '');
     const li = document.createElement('li');
     li.className = 'whitelist-item';
-    li.innerHTML = `<span class="whitelist-domain url-entry" title="${escHtml(url)}">${escHtml(display)}</span>
-      <button class="btn-remove">✕</button>`;
-    li.querySelector('.btn-remove').addEventListener('click', async () => {
+
+    const span = document.createElement('span');
+    span.className = 'whitelist-domain url-entry';
+    span.title = url;
+    span.textContent = display;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-remove';
+    btn.textContent = '✕';
+    btn.setAttribute('aria-label', I18n.t('removeItemLabel', { item: display }));
+    btn.addEventListener('click', async () => {
       const { whitelistUrls: wl = [] } = await chrome.storage.sync.get('whitelistUrls');
-      const updated = wl.filter(u => u !== url);
+      const updated = wl.filter((u) => u !== url);
       await chrome.storage.sync.set({ whitelistUrls: updated });
       renderUrlWhitelist(updated);
-      showToast('✓ URL removed');
+      showToast(I18n.t('toastUrlRemoved'));
     });
+
+    li.appendChild(span);
+    li.appendChild(btn);
     whitelistUrlList.appendChild(li);
   });
 }
@@ -188,7 +197,7 @@ function renderUrlWhitelist(urls) {
 // Add domain
 // ---------------------------------------------------------------------------
 btnAddDomain.addEventListener('click', addDomain);
-domainInput.addEventListener('keydown', e => { if (e.key === 'Enter') addDomain(); });
+domainInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addDomain(); });
 
 async function addDomain() {
   const raw = domainInput.value.trim();
@@ -197,21 +206,21 @@ async function addDomain() {
   if (!isValidDomain(raw)) { domainError.textContent = I18n.t('invalidDomain'); return; }
   const domain = normalizeDomain(raw);
   const { whitelist = [] } = await chrome.storage.sync.get('whitelist');
-  if (whitelist.some(d => d.toLowerCase() === domain)) {
+  if (whitelist.some((d) => d.toLowerCase() === domain)) {
     domainError.textContent = I18n.t('domainExists'); return;
   }
   const updated = [...whitelist, domain];
   await chrome.storage.sync.set({ whitelist: updated });
   domainInput.value = '';
   renderWhitelist(updated);
-  showToast(`✓ ${domain} added`);
+  showToast(I18n.t('toastDomainAdded', { domain }));
 }
 
 // ---------------------------------------------------------------------------
 // Add URL
 // ---------------------------------------------------------------------------
 btnAddUrl.addEventListener('click', addUrl);
-urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') addUrl(); });
+urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addUrl(); });
 
 async function addUrl() {
   const raw = urlInput.value.trim();
@@ -220,14 +229,14 @@ async function addUrl() {
   if (!isValidUrl(raw)) { urlError.textContent = I18n.t('invalidUrl'); return; }
   const normalized = normalizeUrl(raw);
   const { whitelistUrls = [] } = await chrome.storage.sync.get('whitelistUrls');
-  if (whitelistUrls.some(u => u === normalized)) {
+  if (whitelistUrls.some((u) => normalizeUrl(u) === normalized)) {
     urlError.textContent = I18n.t('urlExists'); return;
   }
   const updated = [...whitelistUrls, normalized];
   await chrome.storage.sync.set({ whitelistUrls: updated });
   urlInput.value = '';
   renderUrlWhitelist(updated);
-  showToast('✓ URL added');
+  showToast(I18n.t('toastUrlAdded'));
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +245,7 @@ async function addUrl() {
 function makeToggle(el, key) {
   el.addEventListener('change', async () => {
     await chrome.storage.sync.set({ [key]: el.checked });
-    showToast('✓ Saved');
+    showToast(I18n.t('toastSaved'));
   });
 }
 
@@ -246,14 +255,14 @@ function makeToggle(el, key) {
 async function loadStats() {
   const { totalSuspended = 0 } = await chrome.storage.local.get('totalSuspended');
   statTotalTabs.textContent = totalSuspended.toLocaleString();
-  statTotalMb.textContent = `${(totalSuspended * 60).toLocaleString()} MB`;
+  statTotalMb.textContent = `${(totalSuspended * RAM_PER_TAB_MB).toLocaleString()} MB`;
 }
 
 btnResetStats.addEventListener('click', async () => {
-  if (!confirm('Reset all statistics? This cannot be undone.')) return;
+  if (!confirm(I18n.t('confirmResetStats'))) return;
   await chrome.storage.local.set({ totalSuspended: 0 });
   loadStats();
-  showToast('✓ Statistics reset');
+  showToast(I18n.t('toastStatsReset'));
 });
 
 // ---------------------------------------------------------------------------
@@ -274,15 +283,34 @@ function updateTabLimitVisibility() {
 optTabLimit.addEventListener('change', async () => {
   await chrome.storage.sync.set({ activeTabLimit: optTabLimit.checked });
   updateTabLimitVisibility();
-  showToast('✓ Saved');
+  showToast(I18n.t('toastSaved'));
 });
 
 optTabLimitCount.addEventListener('change', async () => {
   const count = Math.max(1, Math.min(100, parseInt(optTabLimitCount.value, 10) || 20));
   optTabLimitCount.value = count;
   await chrome.storage.sync.set({ activeTabLimitCount: count });
-  showToast('✓ Saved');
+  showToast(I18n.t('toastSaved'));
 });
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts display (live from Chrome)
+// ---------------------------------------------------------------------------
+async function loadShortcuts() {
+  if (!chrome.commands?.getAll) return;
+  try {
+    const commands = await chrome.commands.getAll();
+    const byName = new Map(commands.map((c) => [c.name, c.shortcut]));
+    if (shortcutSuspendCurrent) {
+      shortcutSuspendCurrent.textContent = byName.get('suspend-current-tab') || I18n.t('shortcutNotSet');
+    }
+    if (shortcutSuspendOthers) {
+      shortcutSuspendOthers.textContent = byName.get('suspend-other-tabs') || I18n.t('shortcutNotSet');
+    }
+  } catch {
+    // Keep default labels if unavailable
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Version
@@ -302,35 +330,35 @@ async function init() {
   I18n.apply();
   applySelectI18n(optLang);
   document.title = I18n.t('settingsTitle');
+  if (statsEstimationNote) {
+    statsEstimationNote.textContent = I18n.t('statsEstimationNote', { mb: RAM_PER_TAB_MB });
+  }
   loadVersion();
+  loadShortcuts();
   handleHash();
 
-  const settings = await chrome.storage.sync.get([
-    'enabled', 'thresholdMinutes', 'whitelist', 'whitelistUrls', 'userLanguage',
-    'noSuspendAudio', 'noSuspendPinned', 'noSuspendForms', 'noSuspendGrouped', 'suspendOnMinimize', 'showBadge',
-    'markSuspendedTitle', 'lazyLoadStartup', 'activeTabLimit', 'activeTabLimitCount', 'aggressiveMode'
-  ]);
+  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
 
-  optEnable.checked       = settings.enabled       ?? true;
-  optNoAudio.checked      = settings.noSuspendAudio  ?? true;
-  optNoPinned.checked     = settings.noSuspendPinned ?? true;
-  optNoForms.checked      = settings.noSuspendForms  ?? true;
-  optNoGrouped.checked    = settings.noSuspendGrouped ?? false;
-  optSuspendMin.checked   = settings.suspendOnMinimize ?? false;
-  optShowBadge.checked    = settings.showBadge         ?? true;
-  optMarkTitle.checked    = settings.markSuspendedTitle ?? true;
-  optLazy.checked         = settings.lazyLoadStartup  ?? true;
-  optTabLimit.checked     = settings.activeTabLimit    ?? false;
-  optTabLimitCount.value  = settings.activeTabLimitCount ?? 20;
-  optAggressive.checked   = settings.aggressiveMode   ?? false;
+  optEnable.checked       = settings.enabled;
+  optNoAudio.checked      = settings.noSuspendAudio;
+  optNoPinned.checked     = settings.noSuspendPinned;
+  optNoForms.checked      = settings.noSuspendForms;
+  optNoGrouped.checked    = settings.noSuspendGrouped;
+  optSuspendMin.checked   = settings.suspendOnMinimize;
+  optShowBadge.checked    = settings.showBadge;
+  optMarkTitle.checked    = settings.markSuspendedTitle;
+  optLazy.checked         = settings.lazyLoadStartup;
+  optTabLimit.checked     = settings.activeTabLimit;
+  optTabLimitCount.value  = settings.activeTabLimitCount;
+  optAggressive.checked   = settings.aggressiveMode;
 
   // Timer slider
-  const mins = settings.thresholdMinutes ?? 30;
+  const mins = settings.thresholdMinutes;
   optTimer.value = mins;
   updateSlider(mins);
 
   // Language
-  const langOpt = optLang.querySelector(`option[value="${settings.userLanguage ?? 'auto'}"]`);
+  const langOpt = optLang.querySelector(`option[value="${settings.userLanguage}"]`);
   if (langOpt) langOpt.selected = true;
 
   // Tab limit visibility
@@ -348,8 +376,8 @@ async function init() {
   makeToggle(optLazy, 'lazyLoadStartup');
   makeToggle(optAggressive, 'aggressiveMode');
 
-  renderWhitelist(settings.whitelist ?? []);
-  renderUrlWhitelist(settings.whitelistUrls ?? []);
+  renderWhitelist(settings.whitelist);
+  renderUrlWhitelist(settings.whitelistUrls);
 
   // Configure shortcuts button
   document.getElementById('btn-configure-shortcuts')?.addEventListener('click', () => {

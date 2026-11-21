@@ -1,15 +1,15 @@
 // =============================================================================
 // tests/unit/suspension-logic.test.js
-// Unit tests for the core tab suspension eligibility logic.
+// Unit tests for the core tab suspension eligibility & immunity logic.
 // =============================================================================
 
-const { isTabEligible } = require('../helpers/utils');
+const { isTabEligible, isTabImmune } = require('../../utils/shared');
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 const NOW = Date.now();
-const MINS = m => m * 60 * 1000;
+const MINS = (m) => m * 60 * 1000;
 
 /** Creates a minimal tab object with sensible defaults */
 function makeTab(overrides = {}) {
@@ -221,7 +221,7 @@ describe('isTabEligible() — inactivity threshold', () => {
   const settings = makeSettings({ thresholdMinutes: 30 });
 
   test('tab inactive for less than threshold is NOT eligible', () => {
-    const lastActive = NOW - MINS(15); // only 15 min inactive, threshold is 30
+    const lastActive = NOW - MINS(15);
     const tab = makeTab({ url: 'https://example.com' });
     const result = isTabEligible(tab, settings, lastActive, NOW);
     expect(result.eligible).toBe(false);
@@ -243,7 +243,7 @@ describe('isTabEligible() — inactivity threshold', () => {
   });
 
   test('forceAll=true bypasses threshold check', () => {
-    const lastActive = NOW - MINS(1); // only 1 min inactive
+    const lastActive = NOW - MINS(1);
     const tab = makeTab({ url: 'https://example.com' });
     const result = isTabEligible(tab, settings, lastActive, NOW, true);
     expect(result.eligible).toBe(true);
@@ -256,7 +256,6 @@ describe('isTabEligible() — inactivity threshold', () => {
 describe('isTabEligible() — aggressiveMode', () => {
   test('aggressive mode caps threshold at 5 min', () => {
     const settings = makeSettings({ thresholdMinutes: 30, aggressiveMode: true });
-    // Tab inactive for 6 minutes — would fail normal 30-min threshold but pass 5-min cap
     const lastActive = NOW - MINS(6);
     const tab = makeTab({ url: 'https://example.com' });
     const result = isTabEligible(tab, settings, lastActive, NOW);
@@ -277,6 +276,26 @@ describe('isTabEligible() — aggressiveMode', () => {
     const tab = makeTab({ url: 'https://example.com' });
     const result = isTabEligible(tab, settings, lastActive, NOW);
     expect(result.eligible).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isTabImmune() (used by Window Tabs Manager)
+// ---------------------------------------------------------------------------
+describe('isTabImmune()', () => {
+  const settings = makeSettings();
+
+  test('returns true for pinned, audible, grouped (when enabled), exempt, system, and whitelisted tabs', () => {
+    expect(isTabImmune(makeTab({ pinned: true }), settings)).toBe(true);
+    expect(isTabImmune(makeTab({ audible: true }), settings)).toBe(true);
+    expect(isTabImmune(makeTab({ groupId: 1 }), makeSettings({ noSuspendGrouped: true }))).toBe(true);
+    expect(isTabImmune(makeTab(), settings, true)).toBe(true);
+    expect(isTabImmune(makeTab({ url: 'chrome://settings' }), settings)).toBe(true);
+    expect(isTabImmune(makeTab({ url: 'https://github.com' }), makeSettings({ whitelist: ['github.com'] }))).toBe(true);
+  });
+
+  test('returns false for regular background tab', () => {
+    expect(isTabImmune(makeTab(), settings, false)).toBe(false);
   });
 });
 
