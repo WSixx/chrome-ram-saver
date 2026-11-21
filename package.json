@@ -1,6 +1,6 @@
 {
   "name": "ram-saver",
-  "version": "1.10.2",
+  "version": "1.10.3",
   "description": "Chrome extension for RAM saving via tab suspension",
   "private": true,
   "engines": {
