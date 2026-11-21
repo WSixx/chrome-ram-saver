@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.11.0](https://github.com/WSixx/chrome-ram-saver/compare/v1.10.3...v1.11.0) (2026-11-21)
+
+
+### Features
+
+* add promotional tile image to README ([2503733](https://github.com/WSixx/chrome-ram-saver/commit/2503733664b27f303bb34c5bcfe490ca42eddd29))
+
+
+### Dependencies & Maintenance
+
+* **deps:** override minimatch to ^11.0.1 ([87a8a06](https://github.com/WSixx/chrome-ram-saver/commit/87a8a06449af356306ee6c2efe78c80fe218b639))
+* **deps:** override minimatch to ^11.0.1 ([ae5ebb0](https://github.com/WSixx/chrome-ram-saver/commit/ae5ebb01a95e9af34cd04eaff855641b57da37c4))
+
+
+### Documentation
+
+* add privacy policy detailing local-only data usage ([7a23a97](https://github.com/WSixx/chrome-ram-saver/commit/7a23a972973e40f94faf9041b7b15be0f60f7519))
+
 ## [1.10.3](https://github.com/WSixx/chrome-ram-saver/compare/v1.10.2...v1.10.3) (2026-11-21)
 
 
