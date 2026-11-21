@@ -5,6 +5,8 @@
 
 const {
   normalizeUrl,
+  extractHostname,
+  compileWhitelist,
   findMatchingDomain,
   isDomainWhitelisted,
   findMatchingUrl,
@@ -189,5 +191,69 @@ describe('isTabInGroup()', () => {
     expect(isTabInGroup({ groupId: -1 })).toBe(false);
     expect(isTabInGroup({})).toBe(false);
     expect(isTabInGroup(null)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractHostname()
+// ---------------------------------------------------------------------------
+describe('extractHostname()', () => {
+  test('extracts lowercase hostname without www. prefix or port', () => {
+    expect(extractHostname('https://www.GitHub.com:443/user/repo')).toBe('github.com');
+    expect(extractHostname('http://docs.example.com:8080/page')).toBe('docs.example.com');
+  });
+
+  test('returns empty string for invalid, empty, or hostless URLs', () => {
+    expect(extractHostname('file:///C:/index.html')).toBe('');
+    expect(extractHostname('not-a-url')).toBe('');
+    expect(extractHostname('')).toBe('');
+    expect(extractHostname(null)).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// compileWhitelist() — O(1) compiled matcher parity
+// ---------------------------------------------------------------------------
+describe('compileWhitelist()', () => {
+  const domains = ['GitHub.COM', 'www.google.com', '', null];
+  const urls = [
+    'https://app.example.com/dashboard/',
+    'https://tool.example.com/app',
+    'https://exact.example.com',
+    '',
+    null,
+  ];
+  const compiled = compileWhitelist(domains, urls);
+
+  test('matches exact domains, subdomains, and www with compiled matcher', () => {
+    expect(findMatchingDomain('https://github.com/org/repo', compiled)).toBe('GitHub.COM');
+    expect(findMatchingDomain('https://api.docs.github.com', compiled)).toBe('GitHub.COM');
+    expect(findMatchingDomain('https://www.google.com/search', compiled)).toBe('www.google.com');
+    expect(isDomainWhitelisted('https://mail.google.com', compiled)).toBe(true);
+  });
+
+  test('rejects partial suffixes, non-matching domains, and invalid URLs', () => {
+    expect(isDomainWhitelisted('https://notgithub.com', compiled)).toBe(false);
+    expect(isDomainWhitelisted('https://evil.com', compiled)).toBe(false);
+    expect(isDomainWhitelisted('file:///C:/test.html', compiled)).toBe(false);
+    expect(isDomainWhitelisted('not-a-url', compiled)).toBe(false);
+  });
+
+  test('matches normalized URLs and subpaths at path boundaries only', () => {
+    expect(findMatchingUrl('https://app.example.com/dashboard?tab=1#top', compiled))
+      .toBe('https://app.example.com/dashboard/');
+    expect(isUrlWhitelisted('https://app.example.com/dashboard/settings', compiled)).toBe(true);
+    expect(isUrlWhitelisted('https://exact.example.com/any/path', compiled)).toBe(true);
+
+    // Must not false-positive on sibling path prefixes or spoofed hosts
+    expect(isUrlWhitelisted('https://app.example.com/dashboard-v2', compiled)).toBe(false);
+    expect(isUrlWhitelisted('https://tool.example.com/apple', compiled)).toBe(false);
+    expect(isUrlWhitelisted('https://exact.example.com.evil.com/path', compiled)).toBe(false);
+  });
+
+  test('handles empty compiled whitelist cleanly', () => {
+    const empty = compileWhitelist([], []);
+    expect(isDomainWhitelisted('https://github.com', empty)).toBe(false);
+    expect(isUrlWhitelisted('https://github.com/page', empty)).toBe(false);
   });
 });

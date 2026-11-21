@@ -122,14 +122,19 @@ function applySelectI18n(selectEl) {
 }
 
 // ---------------------------------------------------------------------------
-// Render: domain whitelist (safe DOM construction)
+// Render: domain whitelist (DocumentFragment + Event Delegation)
 // ---------------------------------------------------------------------------
 function renderWhitelist(list) {
-  whitelistList.innerHTML = '';
-  if (!list?.length) { whitelistEmpty.classList.remove('hidden'); return; }
+  if (!list?.length) {
+    whitelistList.replaceChildren();
+    whitelistEmpty.classList.remove('hidden');
+    return;
+  }
   whitelistEmpty.classList.add('hidden');
 
-  list.forEach((domain) => {
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < list.length; i++) {
+    const domain = list[i];
     const li = document.createElement('li');
     li.className = 'whitelist-item';
 
@@ -140,31 +145,44 @@ function renderWhitelist(list) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn-remove';
+    btn.dataset.value = domain;
     btn.textContent = '✕';
     btn.setAttribute('aria-label', I18n.t('removeItemLabel', { item: domain }));
-    btn.addEventListener('click', async () => {
-      const { whitelist: wl = [] } = await chrome.storage.sync.get('whitelist');
-      const updated = wl.filter((d) => d !== domain);
-      await chrome.storage.sync.set({ whitelist: updated });
-      renderWhitelist(updated);
-      showToast(I18n.t('toastDomainRemoved', { domain }));
-    });
 
     li.appendChild(span);
     li.appendChild(btn);
-    whitelistList.appendChild(li);
-  });
+    fragment.appendChild(li);
+  }
+  whitelistList.replaceChildren(fragment);
 }
 
+whitelistList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-remove');
+  if (!btn) return;
+  const domain = btn.dataset.value;
+  if (!domain) return;
+
+  const { whitelist: wl = [] } = await chrome.storage.sync.get('whitelist');
+  const updated = wl.filter((d) => d !== domain);
+  await chrome.storage.sync.set({ whitelist: updated });
+  renderWhitelist(updated);
+  showToast(I18n.t('toastDomainRemoved', { domain }));
+});
+
 // ---------------------------------------------------------------------------
-// Render: URL whitelist (safe DOM construction)
+// Render: URL whitelist (DocumentFragment + Event Delegation)
 // ---------------------------------------------------------------------------
 function renderUrlWhitelist(urls) {
-  whitelistUrlList.innerHTML = '';
-  if (!urls?.length) { whitelistUrlEmp.classList.remove('hidden'); return; }
+  if (!urls?.length) {
+    whitelistUrlList.replaceChildren();
+    whitelistUrlEmp.classList.remove('hidden');
+    return;
+  }
   whitelistUrlEmp.classList.add('hidden');
 
-  urls.forEach((url) => {
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
     const display = url.replace(/^https?:\/\//, '');
     const li = document.createElement('li');
     li.className = 'whitelist-item';
@@ -177,21 +195,29 @@ function renderUrlWhitelist(urls) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn-remove';
+    btn.dataset.value = url;
     btn.textContent = '✕';
     btn.setAttribute('aria-label', I18n.t('removeItemLabel', { item: display }));
-    btn.addEventListener('click', async () => {
-      const { whitelistUrls: wl = [] } = await chrome.storage.sync.get('whitelistUrls');
-      const updated = wl.filter((u) => u !== url);
-      await chrome.storage.sync.set({ whitelistUrls: updated });
-      renderUrlWhitelist(updated);
-      showToast(I18n.t('toastUrlRemoved'));
-    });
 
     li.appendChild(span);
     li.appendChild(btn);
-    whitelistUrlList.appendChild(li);
-  });
+    fragment.appendChild(li);
+  }
+  whitelistUrlList.replaceChildren(fragment);
 }
+
+whitelistUrlList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-remove');
+  if (!btn) return;
+  const url = btn.dataset.value;
+  if (!url) return;
+
+  const { whitelistUrls: wl = [] } = await chrome.storage.sync.get('whitelistUrls');
+  const updated = wl.filter((u) => u !== url);
+  await chrome.storage.sync.set({ whitelistUrls: updated });
+  renderUrlWhitelist(updated);
+  showToast(I18n.t('toastUrlRemoved'));
+});
 
 // ---------------------------------------------------------------------------
 // Add domain
@@ -296,19 +322,14 @@ optTabLimitCount.addEventListener('change', async () => {
 // ---------------------------------------------------------------------------
 // Keyboard shortcuts display (live from Chrome)
 // ---------------------------------------------------------------------------
-async function loadShortcuts() {
-  if (!chrome.commands?.getAll) return;
-  try {
-    const commands = await chrome.commands.getAll();
-    const byName = new Map(commands.map((c) => [c.name, c.shortcut]));
-    if (shortcutSuspendCurrent) {
-      shortcutSuspendCurrent.textContent = byName.get('suspend-current-tab') || I18n.t('shortcutNotSet');
-    }
-    if (shortcutSuspendOthers) {
-      shortcutSuspendOthers.textContent = byName.get('suspend-other-tabs') || I18n.t('shortcutNotSet');
-    }
-  } catch {
-    // Keep default labels if unavailable
+function renderShortcuts(commands) {
+  if (!commands) return;
+  const byName = new Map(commands.map((c) => [c.name, c.shortcut]));
+  if (shortcutSuspendCurrent) {
+    shortcutSuspendCurrent.textContent = byName.get('suspend-current-tab') || I18n.t('shortcutNotSet');
+  }
+  if (shortcutSuspendOthers) {
+    shortcutSuspendOthers.textContent = byName.get('suspend-other-tabs') || I18n.t('shortcutNotSet');
   }
 }
 
@@ -323,10 +344,15 @@ function loadVersion() {
 }
 
 // ---------------------------------------------------------------------------
-// Initialize
+// Initialize (parallelized settings + commands, single sync.get)
 // ---------------------------------------------------------------------------
 async function init() {
-  await I18n.init();
+  const [settings, commands] = await Promise.all([
+    chrome.storage.sync.get(DEFAULT_SETTINGS),
+    chrome.commands?.getAll ? chrome.commands.getAll().catch(() => null) : Promise.resolve(null)
+  ]);
+
+  await I18n.init(settings.userLanguage);
   I18n.apply();
   applySelectI18n(optLang);
   document.title = I18n.t('settingsTitle');
@@ -334,10 +360,8 @@ async function init() {
     statsEstimationNote.textContent = I18n.t('statsEstimationNote', { mb: RAM_PER_TAB_MB });
   }
   loadVersion();
-  loadShortcuts();
+  renderShortcuts(commands);
   handleHash();
-
-  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
 
   optEnable.checked       = settings.enabled;
   optNoAudio.checked      = settings.noSuspendAudio;

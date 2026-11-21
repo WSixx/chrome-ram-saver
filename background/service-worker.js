@@ -8,202 +8,456 @@ importScripts('../utils/shared.js');
 const {
   ALARM_NAME,
   RAM_PER_TAB_MB,
+  MIN_ALARM_DELAY_MS,
+  DIRTY_FORM_COOLDOWN_MS,
   DEFAULT_SETTINGS,
+  extractHostname,
   isSystemUrl,
-  isTabEligible
+  compileWhitelist,
+  isTabEligible,
+  computeNextCheckDelayMs
 } = globalThis.RamSaverUtils;
 
 const SUPPORTED_LOCALES = ['en', 'pt_BR', 'es'];
-const SUSPEND_BATCH_SIZE = 5;
+const SUSPEND_CONCURRENCY = 5;
 const FAVICON_ACK_TIMEOUT_MS = 800;
+const BADGE_DEBOUNCE_MS = 150;
+const SESSION_REMOVE_DEBOUNCE_MS = 50;
+const ALARM_RESCHEDULE_DEBOUNCE_MS = 400;
+const BADGE_BG_COLOR = '#2563EB';
+
+const SUSPENDED_ICON_16_URL = chrome.runtime.getURL('icons/suspended16.png');
+const SUSPENDED_ICON_32_URL = chrome.runtime.getURL('icons/suspended32.png');
 
 let isSuspending = false;
+let hasPrunedSessionThisLifetime = false;
+
+// In-memory settings & compiled whitelist cache (kept in sync via storage.onChanged)
+let cachedSettings = null;
+let compiledWhitelist = null;
+let settingsLoadPromise = null;
+let settingsVersion = 0;
+
+// Badge debounce & deduplication state
+let badgeTimer = null;
+let lastBadgeText = null;
+let badgeColorInitialized = false;
+
+// Alarm reschedule debounce (for bursty immunity changes)
+let alarmRescheduleTimer = null;
+
+// Serialized lifetime counter write queue
+let statsWriteChain = Promise.resolve();
+
+// Pending favicon acknowledgments: tabId -> { resolve, timer }
+const pendingFaviconAcks = new Map();
+// Cooldown cache for tabs with unsaved forms: tabId -> expiresAtMs
+const dirtyFormCache = new Map();
+// In-flight tab discards to prevent duplicate concurrent operations
+const discardingTabIds = new Set();
+// Last active tab per window so inactivity starts when leaving a tab
+const activeTabByWindow = new Map();
+// Micro-batched session storage removals on tab-close bursts
+const pendingSessionRemovals = new Set();
+let sessionRemovalTimer = null;
 
 // ---------------------------------------------------------------------------
-// Form data detection (protect unsubmitted inputs)
+// Settings cache (zero IPC while Service Worker is warm)
 // ---------------------------------------------------------------------------
-async function hasUnsavedFormData(tabId) {
-  try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => {
-        const inputs = document.querySelectorAll(
-          'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]), textarea'
-        );
-        for (const input of inputs) {
-          if (input.value && input.value.trim().length > 0 && input.value !== input.defaultValue) {
-            return true;
-          }
+async function getSettings() {
+  if (cachedSettings) return cachedSettings;
+  if (!settingsLoadPromise) {
+    const versionAtStart = settingsVersion;
+    settingsLoadPromise = chrome.storage.sync
+      .get(DEFAULT_SETTINGS)
+      .then((settings) => {
+        if (versionAtStart === settingsVersion) {
+          cachedSettings = settings;
+          compiledWhitelist = compileWhitelist(settings.whitelist, settings.whitelistUrls);
         }
-        const editables = document.querySelectorAll('[contenteditable="true"]');
-        for (const el of editables) {
-          if (el.innerText && el.innerText.trim().length > 0) {
-            return true;
-          }
-        }
-        return false;
-      }
-    });
-    return results?.[0]?.result === true;
-  } catch {
-    return false;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Tab suspended indicators (💤 title + grayscale favicon)
-// ---------------------------------------------------------------------------
-async function markTabTitleSuspended(tabId) {
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => {
-        if (!document.title.startsWith('💤 ')) {
-          document.title = `💤 ${document.title}`;
-        }
-      }
-    });
-  } catch {
-    // Ignore restricted/uninjectable tabs
-  }
-}
-
-async function grayscaleTabFavicon(tabId) {
-  let timer = null;
-  let onUpdate = null;
-
-  try {
-    const suspendedIconUrl = chrome.runtime.getURL('icons/suspended16.png');
-    const suspendedIcon32Url = chrome.runtime.getURL('icons/suspended32.png');
-
-    // Listen for Chrome to acknowledge the favicon change
-    const faviconAcknowledged = new Promise((resolve) => {
-      onUpdate = (id, changeInfo) => {
-        if (id === tabId && changeInfo.favIconUrl) {
-          resolve(true);
-        }
-      };
-      chrome.tabs.onUpdated.addListener(onUpdate);
-      timer = setTimeout(() => resolve(false), FAVICON_ACK_TIMEOUT_MS);
-    });
-
-    // Execute in MAIN world — Chrome's internal favicon observer
-    // only picks up DOM mutations from the page's main JS context
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      world: 'MAIN',
-      args: [suspendedIconUrl, suspendedIcon32Url],
-      func: (iconUrl, icon32Url) => {
-        document.querySelectorAll(
-          'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
-        ).forEach((el) => el.remove());
-
-        const link = document.createElement('link');
-        link.rel = 'icon';
-        link.type = 'image/png';
-        link.href = iconUrl;
-        document.head.appendChild(link);
-
-        const link32 = document.createElement('link');
-        link32.rel = 'icon';
-        link32.type = 'image/png';
-        link32.sizes = '32x32';
-        link32.href = icon32Url;
-        document.head.appendChild(link32);
-      }
-    });
-
-    await faviconAcknowledged;
-  } catch {
-    // Ignore restricted/uninjectable tabs
-  } finally {
-    if (timer !== null) clearTimeout(timer);
-    if (onUpdate) chrome.tabs.onUpdated.removeListener(onUpdate);
-  }
-}
-
-/**
- * Applies visual suspended indicators (in parallel) and discards the tab.
- * Returns true if the tab was successfully discarded.
- */
-async function discardTab(tabId, settings) {
-  const prepTasks = [grayscaleTabFavicon(tabId)];
-  if (settings.markSuspendedTitle) {
-    prepTasks.push(markTabTitleSuspended(tabId));
-  }
-  await Promise.allSettled(prepTasks);
-
-  try {
-    await chrome.tabs.discard(tabId);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Discards a list of eligible tabs in bounded concurrent batches.
- */
-async function suspendTabsInBatches(tabs, settings, checkForms = false) {
-  let newlySuspended = 0;
-
-  for (let i = 0; i < tabs.length; i += SUSPEND_BATCH_SIZE) {
-    const batch = tabs.slice(i, i + SUSPEND_BATCH_SIZE);
-    const results = await Promise.allSettled(
-      batch.map(async (tab) => {
-        if (checkForms && settings.noSuspendForms) {
-          const hasForm = await hasUnsavedFormData(tab.id);
-          if (hasForm) return false;
-        }
-        return discardTab(tab.id, settings);
+        settingsLoadPromise = null;
+        return cachedSettings || settings;
       })
-    );
+      .catch((err) => {
+        settingsLoadPromise = null;
+        throw err;
+      });
+  }
+  return settingsLoadPromise;
+}
 
-    for (const res of results) {
-      if (res.status === 'fulfilled' && res.value === true) {
-        newlySuspended++;
+// ---------------------------------------------------------------------------
+// Micro-batched session storage cleanup & orphan garbage collection
+// ---------------------------------------------------------------------------
+function flushSessionRemovals() {
+  sessionRemovalTimer = null;
+  if (pendingSessionRemovals.size === 0) return;
+  const keys = Array.from(pendingSessionRemovals);
+  pendingSessionRemovals.clear();
+  chrome.storage.session.remove(keys).catch(() => {});
+}
+
+function queueSessionRemoval(keys) {
+  for (let i = 0; i < keys.length; i++) {
+    pendingSessionRemovals.add(keys[i]);
+  }
+  if (sessionRemovalTimer === null) {
+    sessionRemovalTimer = setTimeout(flushSessionRemovals, SESSION_REMOVE_DEBOUNCE_MS);
+  }
+}
+
+async function pruneOrphanedSessionKeys() {
+  try {
+    const [allTabs, allWindows, sessionData] = await Promise.all([
+      chrome.tabs.query({}),
+      chrome.windows.getAll({}),
+      chrome.storage.session.get(null)
+    ]);
+
+    const validTabIds = new Set();
+    for (let i = 0; i < allTabs.length; i++) {
+      validTabIds.add(allTabs[i].id);
+    }
+    const validWindowIds = new Set();
+    for (let i = 0; i < allWindows.length; i++) {
+      validWindowIds.add(allWindows[i].id);
+    }
+
+    const staleKeys = [];
+    for (const key of Object.keys(sessionData)) {
+      if (key.startsWith('tab_')) {
+        const id = Number(key.slice(4));
+        if (!validTabIds.has(id)) staleKeys.push(key);
+      } else if (key.startsWith('exempt_tab_')) {
+        const id = Number(key.slice(11));
+        if (!validTabIds.has(id)) staleKeys.push(key);
+      } else if (key.startsWith('active_win_')) {
+        const id = Number(key.slice(11));
+        if (!validWindowIds.has(id)) staleKeys.push(key);
+      }
+    }
+
+    if (staleKeys.length > 0) {
+      await chrome.storage.session.remove(staleKeys);
+    }
+  } catch {
+    // Ignore transient pruning errors
+  }
+}
+
+function pruneExpiredDirtyForms(nowMs) {
+  for (const [tabId, expiresAt] of dirtyFormCache.entries()) {
+    if (expiresAt <= nowMs) {
+      dirtyFormCache.delete(tabId);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Single-injection preparation (form detection + 💤 title + grayscale favicon)
+// and tab discard
+// ---------------------------------------------------------------------------
+function resolveFaviconAck(tabId, acknowledged) {
+  const entry = pendingFaviconAcks.get(tabId);
+  if (!entry) return;
+  clearTimeout(entry.timer);
+  pendingFaviconAcks.delete(tabId);
+  entry.resolve(acknowledged);
+}
+
+function createFaviconAckWaiter(tabId) {
+  resolveFaviconAck(tabId, false);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingFaviconAcks.delete(tabId);
+      resolve(false);
+    }, FAVICON_ACK_TIMEOUT_MS);
+    pendingFaviconAcks.set(tabId, { resolve, timer });
+  });
+}
+
+/**
+ * Checks unsaved forms (optional), applies visual suspended indicators in a single
+ * MAIN-world injection, waits for Chrome's favicon acknowledgment when applicable,
+ * and discards the tab.
+ *
+ * @param {chrome.tabs.Tab} tab
+ * @param {object} settings
+ * @param {boolean} [checkForms=false]
+ * @param {boolean} [bypassDirtyCache=false]
+ * @returns {Promise<{ discarded: boolean, dirtyForm: boolean }>}
+ */
+async function prepareAndDiscardTab(tab, settings, checkForms = false, bypassDirtyCache = false) {
+  const tabId = tab?.id;
+  if (!tabId || discardingTabIds.has(tabId)) {
+    return { discarded: false, dirtyForm: false };
+  }
+
+  const shouldCheckForms = Boolean(checkForms && settings.noSuspendForms);
+  if (shouldCheckForms && !bypassDirtyCache) {
+    const dirtyUntil = dirtyFormCache.get(tabId);
+    if (dirtyUntil !== undefined && dirtyUntil > Date.now()) {
+      return { discarded: false, dirtyForm: true };
+    }
+  }
+
+  discardingTabIds.add(tabId);
+  const alreadyHasSuspendedIcon =
+    tab.favIconUrl === SUSPENDED_ICON_16_URL || tab.favIconUrl === SUSPENDED_ICON_32_URL;
+  let faviconAcknowledged = null;
+
+  try {
+    if (!alreadyHasSuspendedIcon) {
+      faviconAcknowledged = createFaviconAckWaiter(tabId);
+    }
+
+    let scriptResult = null;
+    try {
+      // Single MAIN-world injection avoids creating a throwaway ISOLATED V8 context
+      // right before discarding the renderer process, and lets Chrome's favicon
+      // observer pick up <link> mutations from the main JS context.
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        args: [
+          shouldCheckForms,
+          Boolean(settings.markSuspendedTitle),
+          alreadyHasSuspendedIcon,
+          SUSPENDED_ICON_16_URL,
+          SUSPENDED_ICON_32_URL
+        ],
+        func: (detectForms, markTitle, skipFavicon, iconUrl, icon32Url) => {
+          if (detectForms) {
+            const inputs = document.querySelectorAll(
+              'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]), textarea'
+            );
+            for (const input of inputs) {
+              if (
+                input.value !== input.defaultValue &&
+                input.value &&
+                input.value.trim().length > 0
+              ) {
+                return { aborted: true, faviconChanged: false };
+              }
+            }
+            const editables = document.querySelectorAll('[contenteditable="true"]');
+            for (const el of editables) {
+              // Fast path avoids synchronous layout/reflow via innerText on empty nodes
+              if (
+                el.textContent &&
+                el.textContent.trim().length > 0 &&
+                el.innerText &&
+                el.innerText.trim().length > 0
+              ) {
+                return { aborted: true, faviconChanged: false };
+              }
+            }
+          }
+
+          if (markTitle && !document.title.startsWith('💤 ')) {
+            document.title = `💤 ${document.title}`;
+          }
+
+          let faviconChanged = false;
+          if (!skipFavicon && document.head) {
+            document.querySelectorAll(
+              'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
+            ).forEach((el) => el.remove());
+
+            const link = document.createElement('link');
+            link.rel = 'icon';
+            link.type = 'image/png';
+            link.href = iconUrl;
+            document.head.appendChild(link);
+
+            const link32 = document.createElement('link');
+            link32.rel = 'icon';
+            link32.type = 'image/png';
+            link32.sizes = '32x32';
+            link32.href = icon32Url;
+            document.head.appendChild(link32);
+            faviconChanged = true;
+          }
+
+          return { aborted: false, faviconChanged };
+        }
+      });
+      scriptResult = results?.[0]?.result ?? null;
+    } catch {
+      // Restricted/uninjectable tab — proceed directly to discard
+      resolveFaviconAck(tabId, false);
+    }
+
+    if (scriptResult?.aborted) {
+      resolveFaviconAck(tabId, false);
+      dirtyFormCache.set(tabId, Date.now() + DIRTY_FORM_COOLDOWN_MS);
+      return { discarded: false, dirtyForm: true };
+    }
+
+    if (faviconAcknowledged) {
+      if (scriptResult?.faviconChanged) {
+        await faviconAcknowledged;
+      } else {
+        resolveFaviconAck(tabId, false);
+      }
+    }
+
+    try {
+      await chrome.tabs.discard(tabId);
+      dirtyFormCache.delete(tabId);
+      return { discarded: true, dirtyForm: false };
+    } catch {
+      return { discarded: false, dirtyForm: false };
+    }
+  } finally {
+    resolveFaviconAck(tabId, false);
+    discardingTabIds.delete(tabId);
+  }
+}
+
+/**
+ * Discards eligible tabs using a bounded concurrency worker pool (avoids
+ * head-of-line blocking when a single slow tab hits the favicon ack timeout).
+ */
+async function suspendTabsWithPool(tabs, settings, checkForms = false, bypassDirtyCache = false) {
+  if (!tabs.length) {
+    return { suspended: 0, discardedIds: new Set() };
+  }
+
+  let nextIndex = 0;
+  let suspended = 0;
+  const discardedIds = new Set();
+  const workerCount = Math.min(SUSPEND_CONCURRENCY, tabs.length);
+
+  async function worker() {
+    while (nextIndex < tabs.length) {
+      const tab = tabs[nextIndex++];
+      const result = await prepareAndDiscardTab(tab, settings, checkForms, bypassDirtyCache);
+      if (result.discarded) {
+        suspended++;
+        discardedIds.add(tab.id);
       }
     }
   }
 
-  return newlySuspended;
+  const workers = [];
+  for (let i = 0; i < workerCount; i++) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+
+  return { suspended, discardedIds };
 }
 
-async function incrementTotalSuspended(count) {
-  if (count <= 0) return;
-  const { totalSuspended = 0 } = await chrome.storage.local.get('totalSuspended');
-  await chrome.storage.local.set({ totalSuspended: totalSuspended + count });
+function incrementTotalSuspended(count) {
+  if (count <= 0) return Promise.resolve();
+  statsWriteChain = statsWriteChain
+    .then(async () => {
+      const { totalSuspended = 0 } = await chrome.storage.local.get('totalSuspended');
+      await chrome.storage.local.set({ totalSuspended: totalSuspended + count });
+    })
+    .catch(() => {});
+  return statsWriteChain;
 }
 
 // ---------------------------------------------------------------------------
-// Badge management
+// Badge management (debounced + deduplicated)
 // ---------------------------------------------------------------------------
+function scheduleBadgeUpdate() {
+  if (cachedSettings && !cachedSettings.showBadge && lastBadgeText === '') {
+    return;
+  }
+  if (badgeTimer !== null) return;
+  badgeTimer = setTimeout(() => {
+    badgeTimer = null;
+    updateBadge();
+  }, BADGE_DEBOUNCE_MS);
+}
+
 async function updateBadge() {
+  if (badgeTimer !== null) {
+    clearTimeout(badgeTimer);
+    badgeTimer = null;
+  }
   try {
-    const { showBadge = true } = await chrome.storage.sync.get('showBadge');
-    if (!showBadge) {
-      await chrome.action.setBadgeText({ text: '' });
+    const settings = await getSettings();
+    if (!settings.showBadge) {
+      if (lastBadgeText !== '') {
+        await chrome.action.setBadgeText({ text: '' });
+        lastBadgeText = '';
+      }
       return;
     }
-    const tabs = await chrome.tabs.query({});
-    const count = tabs.filter((t) => t.discarded).length;
+    const discardedTabs = await chrome.tabs.query({ discarded: true });
+    const count = discardedTabs.length;
     const text = count > 0 ? (count > 99 ? '99+' : String(count)) : '';
-    await chrome.action.setBadgeText({ text });
-    await chrome.action.setBadgeBackgroundColor({ color: '#2563EB' });
+    if (text !== lastBadgeText) {
+      await chrome.action.setBadgeText({ text });
+      lastBadgeText = text;
+    }
+    if (text && !badgeColorInitialized) {
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_BG_COLOR });
+      badgeColorInitialized = true;
+    }
   } catch {
     // Ignore transient badge update errors
   }
 }
 
 // ---------------------------------------------------------------------------
-// Alarm management
+// Adaptive alarm management (allows MV3 Service Worker to sleep when idle)
 // ---------------------------------------------------------------------------
-async function setupAlarm() {
-  const { aggressiveMode = false } = await chrome.storage.sync.get('aggressiveMode');
-  await chrome.alarms.clear(ALARM_NAME);
-  chrome.alarms.create(ALARM_NAME, {
-    periodInMinutes: aggressiveMode ? 0.5 : 1
+async function scheduleAlarmDelay(delayMs) {
+  if (delayMs === null || delayMs === undefined) {
+    await chrome.alarms.clear(ALARM_NAME);
+    return;
+  }
+  const clampedDelay = Math.max(MIN_ALARM_DELAY_MS, delayMs);
+  await chrome.alarms.create(ALARM_NAME, {
+    when: Date.now() + clampedDelay
   });
+}
+
+function scheduleAlarmRecompute() {
+  if (alarmRescheduleTimer !== null) return;
+  alarmRescheduleTimer = setTimeout(() => {
+    alarmRescheduleTimer = null;
+    setupAlarm().catch(() => {});
+  }, ALARM_RESCHEDULE_DEBOUNCE_MS);
+}
+
+async function setupAlarm() {
+  if (alarmRescheduleTimer !== null) {
+    clearTimeout(alarmRescheduleTimer);
+    alarmRescheduleTimer = null;
+  }
+
+  const settings = await getSettings();
+  if (!settings.enabled) {
+    await chrome.alarms.clear(ALARM_NAME);
+    return;
+  }
+
+  const now = Date.now();
+  pruneExpiredDirtyForms(now);
+
+  const tabs = await chrome.tabs.query({ discarded: false });
+  const keys = [];
+  for (let i = 0; i < tabs.length; i++) {
+    const id = tabs[i].id;
+    keys.push(`tab_${id}`, `exempt_tab_${id}`);
+  }
+  const sessionData = keys.length > 0 ? await chrome.storage.session.get(keys) : {};
+  const delayMs = computeNextCheckDelayMs(
+    tabs,
+    settings,
+    sessionData,
+    sessionData,
+    now,
+    dirtyFormCache,
+    compiledWhitelist
+  );
+  await scheduleAlarmDelay(delayMs);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,99 +474,192 @@ chrome.runtime.onInstalled.addListener(async () => {
   const { totalSuspended } = await chrome.storage.local.get('totalSuspended');
   if (totalSuspended === undefined) await chrome.storage.local.set({ totalSuspended: 0 });
 
-  await setupAlarm();
-  await setupContextMenus();
-
   const tabs = await chrome.tabs.query({});
   const now = Date.now();
   const activityMap = {};
   for (const tab of tabs) {
     activityMap[`tab_${tab.id}`] = tab.active ? now : now - 60000;
+    if (tab.active && tab.windowId !== undefined) {
+      activeTabByWindow.set(tab.windowId, tab.id);
+      activityMap[`active_win_${tab.windowId}`] = tab.id;
+    }
   }
   await chrome.storage.session.set(activityMap);
-  await updateBadge();
+
+  await Promise.all([setupAlarm(), setupContextMenus(), updateBadge()]);
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  await setupAlarm();
-  await setupContextMenus();
+  const [settings] = await Promise.all([
+    getSettings(),
+    setupContextMenus(),
+    pruneOrphanedSessionKeys()
+  ]);
+  hasPrunedSessionThisLifetime = true;
 
-  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   if (!settings.enabled || !settings.lazyLoadStartup) {
-    await updateBadge();
+    await Promise.all([setupAlarm(), updateBadge()]);
     return;
   }
 
   // Discard all eligible non-active tabs on startup
-  const tabs = await chrome.tabs.query({});
+  const tabs = await chrome.tabs.query({ discarded: false });
   const now = Date.now();
   const eligibleTabs = tabs.filter((tab) =>
-    isTabEligible(tab, settings, now, now, true, false, false).eligible
+    isTabEligible(tab, settings, now, now, true, false, false, compiledWhitelist).eligible
   );
 
-  const newlySuspended = await suspendTabsInBatches(eligibleTabs, settings, false);
-  await incrementTotalSuspended(newlySuspended);
-  await updateBadge();
+  const { suspended } = await suspendTabsWithPool(eligibleTabs, settings, false, false);
+  await incrementTotalSuspended(suspended);
+  await Promise.all([setupAlarm(), updateBadge()]);
 });
 
 // ---------------------------------------------------------------------------
 // Tab Activity Tracking
 // ---------------------------------------------------------------------------
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-  await chrome.storage.session.set({ [`tab_${tabId}`]: Date.now() });
+chrome.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
+  const now = Date.now();
+  dirtyFormCache.delete(tabId);
+
+  let prevTabId = activeTabByWindow.get(windowId);
+  if (prevTabId === undefined) {
+    try {
+      const stored = await chrome.storage.session.get(`active_win_${windowId}`);
+      prevTabId = stored[`active_win_${windowId}`];
+    } catch {
+      prevTabId = undefined;
+    }
+  }
+
+  activeTabByWindow.set(windowId, tabId);
+  const updates = {
+    [`tab_${tabId}`]: now,
+    [`active_win_${windowId}`]: tabId
+  };
+  if (prevTabId !== undefined && prevTabId !== tabId) {
+    // Mark when the previously active tab actually became inactive
+    updates[`tab_${prevTabId}`] = now;
+  }
+
+  await chrome.storage.session.set(updates);
 });
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
-  if (changeInfo.status === 'complete') {
-    await chrome.storage.session.set({ [`tab_${tabId}`]: Date.now() });
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.favIconUrl && pendingFaviconAcks.has(tabId)) {
+    resolveFaviconAck(tabId, true);
   }
-  if (changeInfo.discarded !== undefined || changeInfo.status === 'complete') {
-    updateBadge();
+  if (changeInfo.status === 'complete') {
+    dirtyFormCache.delete(tabId);
+    chrome.storage.session.set({ [`tab_${tabId}`]: Date.now() }).catch(() => {});
+    scheduleBadgeUpdate();
+  } else if (changeInfo.discarded !== undefined) {
+    scheduleBadgeUpdate();
+  }
+  if (
+    changeInfo.audible === false ||
+    changeInfo.pinned === false ||
+    changeInfo.groupId === -1
+  ) {
+    scheduleAlarmRecompute();
   }
 });
 
 chrome.tabs.onCreated.addListener(async (tab) => {
   const now = Date.now();
-  await chrome.storage.session.set({ [`tab_${tab.id}`]: now });
+  const sessionWrite = chrome.storage.session.set({ [`tab_${tab.id}`]: now });
 
-  // Active tab limit enforcement
-  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  const settings = await getSettings();
+  await sessionWrite;
   if (!settings.enabled || !settings.activeTabLimit) return;
 
-  const allTabs = await chrome.tabs.query({});
-  const activeTabs = allTabs.filter((t) => !t.discarded);
+  const activeTabs = await chrome.tabs.query({ discarded: false });
   if (activeTabs.length <= settings.activeTabLimitCount) return;
 
-  const activityData = await chrome.storage.session.get(allTabs.map((t) => `tab_${t.id}`));
-  const exemptData = await chrome.storage.session.get(allTabs.map((t) => `exempt_tab_${t.id}`));
+  const keys = [];
+  for (let i = 0; i < activeTabs.length; i++) {
+    const id = activeTabs[i].id;
+    keys.push(`tab_${id}`, `exempt_tab_${id}`);
+  }
+  const sessionData = await chrome.storage.session.get(keys);
 
   const candidates = activeTabs
     .filter((t) =>
-      isTabEligible(t, settings, 0, now, true, Boolean(exemptData[`exempt_tab_${t.id}`]), false).eligible
+      t.id !== tab.id &&
+      !discardingTabIds.has(t.id) &&
+      isTabEligible(
+        t,
+        settings,
+        0,
+        now,
+        true,
+        Boolean(sessionData[`exempt_tab_${t.id}`]),
+        false,
+        compiledWhitelist
+      ).eligible
     )
     .sort((a, b) => {
-      const aTime = activityData[`tab_${a.id}`] ?? 0;
-      const bTime = activityData[`tab_${b.id}`] ?? 0;
+      const aTime = sessionData[`tab_${a.id}`] ?? 0;
+      const bTime = sessionData[`tab_${b.id}`] ?? 0;
       return aTime - bTime; // oldest first
     });
 
   for (const candidate of candidates) {
-    if (settings.noSuspendForms) {
-      const hasForm = await hasUnsavedFormData(candidate.id);
-      if (hasForm) continue;
-    }
-    const discarded = await discardTab(candidate.id, settings);
+    const { discarded } = await prepareAndDiscardTab(candidate, settings, true, false);
     if (discarded) {
       await incrementTotalSuspended(1);
+      scheduleBadgeUpdate();
       break;
     }
   }
-  await updateBadge();
 });
 
-chrome.tabs.onRemoved.addListener(async (tabId) => {
-  await chrome.storage.session.remove([`tab_${tabId}`, `exempt_tab_${tabId}`]);
-  updateBadge();
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  resolveFaviconAck(tabId, false);
+  dirtyFormCache.delete(tabId);
+  if (removeInfo && activeTabByWindow.get(removeInfo.windowId) === tabId) {
+    activeTabByWindow.delete(removeInfo.windowId);
+  }
+  queueSessionRemoval([`tab_${tabId}`, `exempt_tab_${tabId}`]);
+  scheduleBadgeUpdate();
+});
+
+chrome.tabs.onReplaced.addListener(async (addedTabId, removedTabId) => {
+  resolveFaviconAck(removedTabId, false);
+  dirtyFormCache.delete(removedTabId);
+
+  try {
+    const oldTabKey = `tab_${removedTabId}`;
+    const oldExemptKey = `exempt_tab_${removedTabId}`;
+    const data = await chrome.storage.session.get([oldTabKey, oldExemptKey]);
+    const toSet = {};
+    if (data[oldExemptKey]) {
+      toSet[`exempt_tab_${addedTabId}`] = true;
+    }
+    if (data[oldTabKey] !== undefined) {
+      toSet[`tab_${addedTabId}`] = data[oldTabKey];
+    }
+    if (Object.keys(toSet).length > 0) {
+      await chrome.storage.session.set(toSet);
+    }
+    queueSessionRemoval([oldTabKey, oldExemptKey]);
+  } catch {
+    // Ignore transient session storage errors
+  }
+
+  for (const [winId, activeId] of activeTabByWindow.entries()) {
+    if (activeId === removedTabId) {
+      activeTabByWindow.set(winId, addedTabId);
+      chrome.storage.session.set({ [`active_win_${winId}`]: addedTabId }).catch(() => {});
+      break;
+    }
+  }
+
+  scheduleBadgeUpdate();
+});
+
+chrome.windows.onRemoved.addListener((windowId) => {
+  activeTabByWindow.delete(windowId);
+  queueSessionRemoval([`active_win_${windowId}`]);
 });
 
 // ---------------------------------------------------------------------------
@@ -321,10 +668,8 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 chrome.windows.onFocusChanged.addListener(async (windowId) => {
   if (windowId !== chrome.windows.WINDOW_ID_NONE) return;
 
-  const { suspendOnMinimize = false, enabled = true } =
-    await chrome.storage.sync.get(['suspendOnMinimize', 'enabled']);
-
-  if (!suspendOnMinimize || !enabled) return;
+  const settings = cachedSettings || (await getSettings());
+  if (!settings.suspendOnMinimize || !settings.enabled) return;
 
   try {
     const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
@@ -338,14 +683,41 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
 });
 
 // ---------------------------------------------------------------------------
-// Storage change listener (update alarm, badge, or context menus)
+// Storage change listener (sync cache, alarm, badge, context menus)
 // ---------------------------------------------------------------------------
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync') {
-    if (changes.aggressiveMode) setupAlarm();
-    if (changes.showBadge) updateBadge();
-    if (changes.userLanguage) setupContextMenus();
+  if (area !== 'sync') return;
+
+  settingsVersion++;
+  if (cachedSettings) {
+    for (const [key, { newValue }] of Object.entries(changes)) {
+      cachedSettings[key] = newValue !== undefined ? newValue : DEFAULT_SETTINGS[key];
+    }
+    if (changes.whitelist || changes.whitelistUrls) {
+      compiledWhitelist = compileWhitelist(
+        cachedSettings.whitelist,
+        cachedSettings.whitelistUrls
+      );
+    }
+  } else {
+    settingsLoadPromise = null;
   }
+
+  if (
+    changes.enabled ||
+    changes.aggressiveMode ||
+    changes.thresholdMinutes ||
+    changes.whitelist ||
+    changes.whitelistUrls ||
+    changes.noSuspendAudio ||
+    changes.noSuspendPinned ||
+    changes.noSuspendForms ||
+    changes.noSuspendGrouped
+  ) {
+    setupAlarm().catch(() => {});
+  }
+  if (changes.showBadge) updateBadge();
+  if (changes.userLanguage) setupContextMenus();
 });
 
 // ---------------------------------------------------------------------------
@@ -356,27 +728,48 @@ async function suspendInactiveTabs(forceAll = false) {
   isSuspending = true;
 
   try {
-    const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
-    if (!settings.enabled && !forceAll) return { suspended: 0 };
+    const settings = await getSettings();
+    if (!settings.enabled && !forceAll) {
+      await scheduleAlarmDelay(null);
+      return { suspended: 0 };
+    }
 
     const now = Date.now();
-    const tabs = await chrome.tabs.query({});
-    const activityData = await chrome.storage.session.get(tabs.map((t) => `tab_${t.id}`));
-    const exemptData = await chrome.storage.session.get(tabs.map((t) => `exempt_tab_${t.id}`));
+    pruneExpiredDirtyForms(now);
+
+    const tabs = await chrome.tabs.query({ discarded: false });
+    const keys = [];
+    for (let i = 0; i < tabs.length; i++) {
+      const id = tabs[i].id;
+      keys.push(`tab_${id}`, `exempt_tab_${id}`);
+    }
+    const sessionData = keys.length > 0 ? await chrome.storage.session.get(keys) : {};
 
     const missingActivity = {};
     const eligibleTabs = [];
 
-    for (const tab of tabs) {
-      let lastActive = activityData[`tab_${tab.id}`];
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i];
+      const tabKey = `tab_${tab.id}`;
+      let lastActive = sessionData[tabKey];
       if (lastActive === undefined) {
         // Give newly tracked tabs (e.g. after SW/extension reload) a grace period
         lastActive = now;
-        missingActivity[`tab_${tab.id}`] = now;
+        sessionData[tabKey] = now;
+        missingActivity[tabKey] = now;
       }
 
-      const isExempt = Boolean(exemptData[`exempt_tab_${tab.id}`]);
-      const check = isTabEligible(tab, settings, lastActive, now, forceAll, isExempt, false);
+      const isExempt = Boolean(sessionData[`exempt_tab_${tab.id}`]);
+      const check = isTabEligible(
+        tab,
+        settings,
+        lastActive,
+        now,
+        forceAll,
+        isExempt,
+        false,
+        compiledWhitelist
+      );
       if (check.eligible) {
         eligibleTabs.push(tab);
       }
@@ -386,11 +779,39 @@ async function suspendInactiveTabs(forceAll = false) {
       await chrome.storage.session.set(missingActivity);
     }
 
-    const newlySuspended = await suspendTabsInBatches(eligibleTabs, settings, true);
-    await incrementTotalSuspended(newlySuspended);
-    await updateBadge();
+    const { suspended, discardedIds } = await suspendTabsWithPool(
+      eligibleTabs,
+      settings,
+      true,
+      forceAll
+    );
 
-    return { suspended: newlySuspended };
+    if (suspended > 0) {
+      await incrementTotalSuspended(suspended);
+      await updateBadge();
+    }
+
+    // Schedule next adaptive check excluding tabs we just discarded
+    const remainingTabs = discardedIds.size > 0
+      ? tabs.filter((t) => !discardedIds.has(t.id))
+      : tabs;
+    const nextDelayMs = computeNextCheckDelayMs(
+      remainingTabs,
+      settings,
+      sessionData,
+      sessionData,
+      Date.now(),
+      dirtyFormCache,
+      compiledWhitelist
+    );
+    await scheduleAlarmDelay(nextDelayMs);
+
+    if (!hasPrunedSessionThisLifetime) {
+      hasPrunedSessionThisLifetime = true;
+      pruneOrphanedSessionKeys();
+    }
+
+    return { suspended };
   } finally {
     isSuspending = false;
   }
@@ -400,7 +821,7 @@ async function suspendInactiveTabs(forceAll = false) {
 // Alarm handler
 // ---------------------------------------------------------------------------
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM_NAME) suspendInactiveTabs();
+  if (alarm.name === ALARM_NAME) suspendInactiveTabs(false);
 });
 
 // ---------------------------------------------------------------------------
@@ -416,7 +837,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === 'getStats') {
     getStats()
       .then(sendResponse)
-      .catch((err) => sendResponse({ sessionSuspended: 0, sessionSavedMB: 0, totalSuspended: 0, totalSavedMB: 0, error: err?.message }));
+      .catch((err) => sendResponse({
+        sessionSuspended: 0,
+        sessionSavedMB: 0,
+        totalSuspended: 0,
+        totalSavedMB: 0,
+        error: err?.message
+      }));
     return true;
   }
   if (message.action === 'updateBadge') {
@@ -439,9 +866,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // Stats
 // ---------------------------------------------------------------------------
 async function getStats() {
-  const tabs = await chrome.tabs.query({});
-  const discarded = tabs.filter((t) => t.discarded).length;
-  const { totalSuspended = 0 } = await chrome.storage.local.get('totalSuspended');
+  const [discardedTabs, { totalSuspended = 0 }] = await Promise.all([
+    chrome.tabs.query({ discarded: true }),
+    chrome.storage.local.get('totalSuspended')
+  ]);
+  const discarded = discardedTabs.length;
   return {
     sessionSuspended: discarded,
     sessionSavedMB: discarded * RAM_PER_TAB_MB,
@@ -468,8 +897,8 @@ async function suspendSingleTab(tab) {
     await chrome.tabs.update(nextTab.id, { active: true });
   }
 
-  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
-  const discarded = await discardTab(tab.id, settings);
+  const settings = await getSettings();
+  const { discarded } = await prepareAndDiscardTab(tab, settings, false, true);
   if (discarded) {
     await incrementTotalSuspended(1);
     await updateBadge();
@@ -477,36 +906,35 @@ async function suspendSingleTab(tab) {
 }
 
 async function suspendOtherTabsInWindow(windowId, activeTabId) {
-  const tabs = await chrome.tabs.query({ windowId });
-  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
-  const exemptData = await chrome.storage.session.get(tabs.map((t) => `exempt_tab_${t.id}`));
+  const [tabs, settings] = await Promise.all([
+    chrome.tabs.query({ windowId, discarded: false }),
+    getSettings()
+  ]);
+  const exemptKeys = tabs.map((t) => `exempt_tab_${t.id}`);
+  const exemptData = exemptKeys.length > 0 ? await chrome.storage.session.get(exemptKeys) : {};
   const now = Date.now();
 
   const eligibleTabs = tabs.filter((tab) => {
     if (tab.id === activeTabId) return false;
     const isExempt = Boolean(exemptData[`exempt_tab_${tab.id}`]);
-    return isTabEligible(tab, settings, now, now, true, isExempt, false).eligible;
+    return isTabEligible(tab, settings, now, now, true, isExempt, false, compiledWhitelist).eligible;
   });
 
-  const newlySuspended = await suspendTabsInBatches(eligibleTabs, settings, true);
-  if (newlySuspended > 0) {
-    await incrementTotalSuspended(newlySuspended);
+  const { suspended } = await suspendTabsWithPool(eligibleTabs, settings, true, true);
+  if (suspended > 0) {
+    await incrementTotalSuspended(suspended);
     await updateBadge();
   }
 }
 
 async function whitelistCurrentDomain(tab) {
   if (!tab?.url || isSystemUrl(tab.url)) return;
-  try {
-    const hostname = new URL(tab.url).hostname.toLowerCase().replace(/^www\./, '');
-    if (!hostname) return;
-    const { whitelist = [] } = await chrome.storage.sync.get('whitelist');
-    if (!whitelist.includes(hostname)) {
-      whitelist.push(hostname);
-      await chrome.storage.sync.set({ whitelist });
-    }
-  } catch {
-    // Ignore invalid URLs
+  const hostname = extractHostname(tab.url);
+  if (!hostname) return;
+  const { whitelist = [] } = await chrome.storage.sync.get('whitelist');
+  if (!whitelist.includes(hostname)) {
+    whitelist.push(hostname);
+    await chrome.storage.sync.set({ whitelist });
   }
 }
 
@@ -515,7 +943,7 @@ async function whitelistCurrentDomain(tab) {
 // ---------------------------------------------------------------------------
 async function loadLocaleMessages() {
   try {
-    const { userLanguage = 'auto' } = await chrome.storage.sync.get('userLanguage');
+    const { userLanguage = 'auto' } = await getSettings();
     let lang = userLanguage;
     if (lang === 'auto') {
       const ui = (chrome.i18n.getUILanguage?.() || 'en').toLowerCase();

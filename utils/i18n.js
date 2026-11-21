@@ -10,10 +10,13 @@
     _messages: {},
     _lang: 'en',
 
-    async init() {
+    async init(preferredLanguage) {
       let lang = 'en';
       try {
-        const { userLanguage = 'auto' } = await chrome.storage.sync.get('userLanguage');
+        let userLanguage = preferredLanguage;
+        if (userLanguage === undefined) {
+          ({ userLanguage = 'auto' } = await chrome.storage.sync.get('userLanguage'));
+        }
         if (userLanguage === 'auto') {
           const ui = (navigator.language || 'en').toLowerCase();
           if (ui.startsWith('pt')) lang = 'pt_BR';
@@ -57,18 +60,27 @@
     },
 
     apply() {
-      document.querySelectorAll('[data-i18n]').forEach((el) => {
-        const v = this.t(el.getAttribute('data-i18n'));
-        if (v) el.textContent = v;
-      });
-      document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-        const v = this.t(el.getAttribute('data-i18n-placeholder'));
-        if (v) el.placeholder = v;
-      });
-      document.querySelectorAll('[data-i18n-title]').forEach((el) => {
-        const v = this.t(el.getAttribute('data-i18n-title'));
-        if (v) el.title = v;
-      });
+      const elements = document.querySelectorAll(
+        '[data-i18n], [data-i18n-placeholder], [data-i18n-title]'
+      );
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i];
+        const textKey = el.getAttribute('data-i18n');
+        if (textKey) {
+          const v = this.t(textKey);
+          if (v) el.textContent = v;
+        }
+        const phKey = el.getAttribute('data-i18n-placeholder');
+        if (phKey) {
+          const v = this.t(phKey);
+          if (v) el.placeholder = v;
+        }
+        const titleKey = el.getAttribute('data-i18n-title');
+        if (titleKey) {
+          const v = this.t(titleKey);
+          if (v) el.title = v;
+        }
+      }
     }
   };
 

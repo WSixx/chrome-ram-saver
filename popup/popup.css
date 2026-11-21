@@ -164,6 +164,7 @@ input:focus-visible,
 }
 
 .status-dot {
+  position: relative;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -173,13 +174,29 @@ input:focus-visible,
 
 .status-dot.active {
   background: var(--green);
-  box-shadow: 0 0 8px rgba(16,185,129,0.6);
-  animation: pulse-dot 2s infinite;
+  box-shadow: 0 0 8px rgba(16,185,129,0.55);
+}
+
+.status-dot.active::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: rgba(16,185,129,0.45);
+  pointer-events: none;
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
 @keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 8px rgba(16,185,129,0.6); }
-  50%       { box-shadow: 0 0 14px rgba(16,185,129,0.9); }
+  0%, 100% { transform: scale(0.85); opacity: 0.35; }
+  50%       { transform: scale(1.35); opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.active::after {
+    animation: none;
+    opacity: 0.5;
+  }
 }
 
 .status-text {
@@ -561,6 +578,8 @@ input:focus-visible,
   background: transparent;
   transition: background 0.15s ease;
   cursor: pointer;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 38px;
 }
 
 .tab-item:hover {
