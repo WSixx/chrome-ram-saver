@@ -3,7 +3,13 @@
 // Unit tests for the core tab suspension eligibility & immunity logic.
 // =============================================================================
 
-const { isTabEligible, isTabImmune } = require('../../utils/shared');
+const {
+  MIN_ALARM_DELAY_MS,
+  compileWhitelist,
+  isTabEligible,
+  isTabImmune,
+  computeNextCheckDelayMs,
+} = require('../../utils/shared');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -316,5 +322,133 @@ describe('isTabEligible() — happy path (eligible)', () => {
     const result = isTabEligible(tab, settings, lastActive, NOW);
     expect(result.eligible).toBe(true);
     expect(result.reason).toBe('ok');
+  });
+
+  test('compiled whitelist matches identically in isTabEligible() and isTabImmune()', () => {
+    const settings = makeSettings({
+      whitelist: ['github.com'],
+      whitelistUrls: ['https://app.example.com/dashboard'],
+    });
+    const compiled = compileWhitelist(settings.whitelist, settings.whitelistUrls);
+    const inactiveAgo = NOW - MINS(60);
+
+    expect(isTabEligible(makeTab({ url: 'https://docs.github.com' }), settings, inactiveAgo, NOW, false, false, false, compiled))
+      .toEqual({ eligible: false, reason: 'domain_whitelisted' });
+    expect(isTabEligible(makeTab({ url: 'https://app.example.com/dashboard/sub' }), settings, inactiveAgo, NOW, false, false, false, compiled))
+      .toEqual({ eligible: false, reason: 'url_whitelisted' });
+    expect(isTabEligible(makeTab({ url: 'https://news.ycombinator.com' }), settings, inactiveAgo, NOW, false, false, false, compiled))
+      .toEqual({ eligible: true, reason: 'ok' });
+
+    expect(isTabImmune(makeTab({ url: 'https://docs.github.com' }), settings, false, compiled)).toBe(true);
+    expect(isTabImmune(makeTab({ url: 'https://app.example.com/dashboard' }), settings, false, compiled)).toBe(true);
+    expect(isTabImmune(makeTab({ url: 'https://news.ycombinator.com' }), settings, false, compiled)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeNextCheckDelayMs() — adaptive MV3 alarm scheduler
+// ---------------------------------------------------------------------------
+describe('computeNextCheckDelayMs()', () => {
+  test('returns null when extension is disabled (allows alarm removal)', () => {
+    const settings = makeSettings({ enabled: false, thresholdMinutes: 30 });
+    const tabs = [makeTab({ id: 1 })];
+    expect(computeNextCheckDelayMs(tabs, settings, { tab_1: NOW - MINS(60) }, {}, NOW)).toBeNull();
+  });
+
+  test('returns full threshold when no non-immune background tabs exist', () => {
+    const settings = makeSettings({ thresholdMinutes: 30, whitelist: ['github.com'] });
+    const compiled = compileWhitelist(settings.whitelist, settings.whitelistUrls);
+    const tabs = [
+      makeTab({ id: 1, active: true }),
+      makeTab({ id: 2, discarded: true }),
+      makeTab({ id: 3, pinned: true }),
+      makeTab({ id: 4, audible: true }),
+      makeTab({ id: 5, url: 'https://github.com/repo' }),
+      makeTab({ id: 6, url: 'chrome://settings' }),
+      makeTab({ id: 7 }), // session-exempt below
+    ];
+    const delay = computeNextCheckDelayMs(
+      tabs,
+      settings,
+      {},
+      { exempt_tab_7: true },
+      NOW,
+      null,
+      compiled
+    );
+    expect(delay).toBe(MINS(30));
+  });
+
+  test('schedules for the earliest expiring background tab', () => {
+    const settings = makeSettings({ thresholdMinutes: 30 });
+    const tabs = [
+      makeTab({ id: 1, active: true }),
+      makeTab({ id: 2 }), // inactive 10 min -> 20 min left
+      makeTab({ id: 3 }), // inactive 26 min -> 4 min left
+    ];
+    const activity = {
+      tab_1: NOW,
+      tab_2: NOW - MINS(10),
+      tab_3: NOW - MINS(26),
+    };
+    const delay = computeNextCheckDelayMs(tabs, settings, activity, {}, NOW);
+    expect(delay).toBe(MINS(4));
+  });
+
+  test('clamps past-due tabs to MIN_ALARM_DELAY_MS (30s Chrome MV3 floor)', () => {
+    const settings = makeSettings({ thresholdMinutes: 30 });
+    const tabs = [makeTab({ id: 1 })];
+    const delay = computeNextCheckDelayMs(tabs, settings, { tab_1: NOW - MINS(45) }, {}, NOW);
+    expect(delay).toBe(MIN_ALARM_DELAY_MS);
+  });
+
+  test('caps maximum delay at 5 minutes in aggressiveMode (allows SW hibernation)', () => {
+    const settings = makeSettings({ thresholdMinutes: 30, aggressiveMode: true });
+    const tabs = [makeTab({ id: 1 })];
+    const delay = computeNextCheckDelayMs(tabs, settings, { tab_1: NOW }, {}, NOW);
+    expect(delay).toBe(MINS(5));
+  });
+
+  test('respects dirty-form cooldown instead of polling every 30s', () => {
+    const settings = makeSettings({ thresholdMinutes: 30 });
+    const tabs = [makeTab({ id: 1 })];
+    const dirtyFormMap = new Map([[1, NOW + MINS(5)]]);
+    // Tab 1 is past threshold (45 min inactive), but has an active 5 min dirty-form cooldown
+    const delay = computeNextCheckDelayMs(
+      tabs,
+      settings,
+      { tab_1: NOW - MINS(45) },
+      {},
+      NOW,
+      dirtyFormMap
+    );
+    expect(delay).toBe(MINS(5));
+  });
+
+  test('picks earlier normal tab over a dirty-form tab with longer cooldown', () => {
+    const settings = makeSettings({ thresholdMinutes: 30 });
+    const tabs = [makeTab({ id: 1 }), makeTab({ id: 2 })];
+    const dirtyFormMap = new Map([[1, NOW + MINS(5)]]);
+    const activity = {
+      tab_1: NOW - MINS(45),
+      tab_2: NOW - MINS(28), // 2 min remaining
+    };
+    const delay = computeNextCheckDelayMs(tabs, settings, activity, {}, NOW, dirtyFormMap);
+    expect(delay).toBe(MINS(2));
+  });
+
+  test('treats expired dirty-form cooldown entries normally', () => {
+    const settings = makeSettings({ thresholdMinutes: 30 });
+    const tabs = [makeTab({ id: 1 })];
+    const dirtyFormMap = new Map([[1, NOW - 1000]]); // already expired
+    const delay = computeNextCheckDelayMs(
+      tabs,
+      settings,
+      { tab_1: NOW - MINS(45) },
+      {},
+      NOW,
+      dirtyFormMap
+    );
+    expect(delay).toBe(MIN_ALARM_DELAY_MS);
   });
 });

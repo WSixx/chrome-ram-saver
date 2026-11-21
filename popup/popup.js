@@ -4,8 +4,11 @@
 
 const {
   DEFAULT_SETTINGS,
+  RAM_PER_TAB_MB,
   normalizeUrl,
+  extractHostname,
   isSystemUrl,
+  compileWhitelist,
   findMatchingDomain,
   findMatchingUrl,
   isTabImmune
@@ -14,20 +17,20 @@ const {
 // ---------------------------------------------------------------------------
 // DOM refs
 // ---------------------------------------------------------------------------
-const globalToggle  = document.getElementById('global-toggle');
-const statusDot     = document.getElementById('status-dot');
-const statusText    = document.getElementById('status-text');
-const statMb        = document.getElementById('stat-mb');
-const statTabs      = document.getElementById('stat-tabs');
-const timerSelect   = document.getElementById('timer-select');
-const btnSuspendAll = document.getElementById('btn-suspend-all');
-const btnSettings   = document.getElementById('btn-settings');
-const btnWlDomain   = document.getElementById('btn-wl-domain');
-const btnWlUrl      = document.getElementById('btn-wl-url');
-const btnWlTab      = document.getElementById('btn-wl-tab');
-const currentDomain = document.getElementById('current-tab-domain');
-const currentTabRow = document.getElementById('current-tab-row');
-const toast         = document.getElementById('toast');
+const globalToggle      = document.getElementById('global-toggle');
+const statusDot         = document.getElementById('status-dot');
+const statusText        = document.getElementById('status-text');
+const statMb            = document.getElementById('stat-mb');
+const statTabs          = document.getElementById('stat-tabs');
+const timerSelect       = document.getElementById('timer-select');
+const btnSuspendAll     = document.getElementById('btn-suspend-all');
+const btnSettings       = document.getElementById('btn-settings');
+const btnWlDomain       = document.getElementById('btn-wl-domain');
+const btnWlUrl          = document.getElementById('btn-wl-url');
+const btnWlTab          = document.getElementById('btn-wl-tab');
+const currentDomain     = document.getElementById('current-tab-domain');
+const currentTabRow     = document.getElementById('current-tab-row');
+const toast             = document.getElementById('toast');
 const tabsManagerCard   = document.getElementById('tabs-manager-card');
 const tabsManagerHeader = document.getElementById('tabs-manager-header');
 const tabsCountBadge    = document.getElementById('tabs-count-badge');
@@ -35,27 +38,49 @@ const tabSearchInput    = document.getElementById('tab-search-input');
 const tabsList          = document.getElementById('tabs-list');
 const tabsEmpty         = document.getElementById('tabs-empty');
 
-// Current tab info (populated in loadCurrentTab)
+// Cached popup state
+let _settings = { ...DEFAULT_SETTINGS };
+let _compiledWhitelist = compileWhitelist([], []);
 let _currentTab = null;
 let _currentHostname = '';
 let _currentNormalizedUrl = '';
+let _rawWindowTabs = [];
 let _windowTabs = [];
 let _filterQuery = '';
+let _isCollapsed = false;
+let _tabsRendered = false;
 
 // ---------------------------------------------------------------------------
-// Animated counter
+// Animated counter (cancels in-flight animations & respects reduced motion)
 // ---------------------------------------------------------------------------
+const activeAnimations = new WeakMap();
+const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
 function animateValue(el, from, to, duration = 500) {
-  if (from === to) { el.textContent = to; return; }
+  const prevRaf = activeAnimations.get(el);
+  if (prevRaf !== undefined) {
+    cancelAnimationFrame(prevRaf);
+    activeAnimations.delete(el);
+  }
+
+  if (from === to || prefersReducedMotion) {
+    el.textContent = to;
+    return;
+  }
+
   const start = performance.now();
   function update(now) {
     const elapsed = Math.min(now - start, duration);
     const ease = 1 - Math.pow(1 - elapsed / duration, 3);
     el.textContent = Math.round(from + (to - from) * ease);
-    if (elapsed < duration) requestAnimationFrame(update);
-    else el.textContent = to;
+    if (elapsed < duration) {
+      activeAnimations.set(el, requestAnimationFrame(update));
+    } else {
+      el.textContent = to;
+      activeAnimations.delete(el);
+    }
   }
-  requestAnimationFrame(update);
+  activeAnimations.set(el, requestAnimationFrame(update));
 }
 
 // ---------------------------------------------------------------------------
@@ -79,9 +104,10 @@ function updateStatusUI(enabled) {
 }
 
 // ---------------------------------------------------------------------------
-// Stats
+// Stats (queried directly without waking up the Service Worker)
 // ---------------------------------------------------------------------------
-let prevMb = 0, prevTabs = 0;
+let prevMb = 0;
+let prevTabs = 0;
 function updateStats(stats) {
   animateValue(statMb, prevMb, stats.sessionSavedMB, 600);
   animateValue(statTabs, prevTabs, stats.sessionSuspended, 600);
@@ -89,75 +115,9 @@ function updateStats(stats) {
   prevTabs = stats.sessionSuspended;
 }
 
-function loadStats() {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ action: 'getStats' }, (stats) => {
-      if (!chrome.runtime.lastError && stats) {
-        updateStats(stats);
-      }
-      resolve();
-    });
-  });
-}
-
 // ---------------------------------------------------------------------------
-// Current tab — load and render whitelist buttons
+// Current tab quick-whitelist row
 // ---------------------------------------------------------------------------
-async function loadCurrentTab() {
-  if (!currentTabRow) return;
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.url || isSystemUrl(tab.url)) {
-      currentTabRow.style.display = 'none';
-      return;
-    }
-
-    let hostname = '';
-    try {
-      hostname = new URL(tab.url).hostname.toLowerCase().replace(/^www\./, '');
-    } catch {
-      hostname = '';
-    }
-
-    if (!hostname) {
-      currentTabRow.style.display = 'none';
-      return;
-    }
-
-    currentTabRow.style.display = 'flex';
-
-    _currentTab = tab;
-    _currentHostname = hostname;
-    _currentNormalizedUrl = normalizeUrl(tab.url);
-
-    currentDomain.textContent = hostname;
-
-    const { whitelist = [], whitelistUrls = [] } =
-      await chrome.storage.sync.get(['whitelist', 'whitelistUrls']);
-
-    const matchedDomain = findMatchingDomain(tab.url, whitelist);
-    const isDomainWL = matchedDomain !== null;
-
-    const matchedUrl = findMatchingUrl(tab.url, whitelistUrls);
-    const isUrlWL = matchedUrl !== null;
-
-    const { [`exempt_tab_${_currentTab.id}`]: isTabExempt = false } =
-      await chrome.storage.session.get(`exempt_tab_${_currentTab.id}`);
-
-    renderWlButton(btnWlDomain, isDomainWL, 'excludeDomain', 'currentTabWhitelistedDomain', 'wlDomainTitle');
-    renderWlButton(btnWlUrl, isUrlWL, 'excludeUrl', 'currentTabWhitelistedUrl', 'wlUrlTitle');
-    renderWlButton(btnWlTab, isTabExempt, 'excludeTab', 'currentTabWhitelistedTab', 'wlTabTitle');
-
-    btnWlDomain.dataset.action = isDomainWL ? 'remove' : 'add';
-    btnWlDomain.dataset.matchedEntry = matchedDomain || '';
-    btnWlUrl.dataset.action = isUrlWL ? 'remove' : 'add';
-    btnWlUrl.dataset.matchedEntry = matchedUrl || '';
-    btnWlTab.dataset.action = isTabExempt ? 'remove' : 'add';
-  } catch {
-    if (currentTabRow) currentTabRow.style.display = 'none';
-  }
-}
-
 function renderWlButton(btn, isActive, labelKey, activeLabel, titleKey) {
   if (isActive) {
     btn.textContent = `✓ ${I18n.t(activeLabel)}`;
@@ -168,6 +128,275 @@ function renderWlButton(btn, isActive, labelKey, activeLabel, titleKey) {
   }
   btn.title = I18n.t(titleKey);
 }
+
+function renderCurrentTabRow(activeTab, exemptData) {
+  if (!currentTabRow) return;
+  if (!activeTab || !activeTab.url || isSystemUrl(activeTab.url)) {
+    currentTabRow.style.display = 'none';
+    _currentTab = null;
+    _currentHostname = '';
+    _currentNormalizedUrl = '';
+    return;
+  }
+
+  const hostname = extractHostname(activeTab.url);
+  if (!hostname) {
+    currentTabRow.style.display = 'none';
+    _currentTab = null;
+    _currentHostname = '';
+    _currentNormalizedUrl = '';
+    return;
+  }
+
+  currentTabRow.style.display = 'flex';
+  _currentTab = activeTab;
+  _currentHostname = hostname;
+  _currentNormalizedUrl = normalizeUrl(activeTab.url);
+  currentDomain.textContent = hostname;
+
+  const matchedDomain = findMatchingDomain(activeTab.url, _compiledWhitelist);
+  const isDomainWL = matchedDomain !== null;
+
+  const matchedUrl = findMatchingUrl(activeTab.url, _compiledWhitelist);
+  const isUrlWL = matchedUrl !== null;
+
+  const isTabExempt = Boolean(exemptData[`exempt_tab_${activeTab.id}`]);
+
+  renderWlButton(btnWlDomain, isDomainWL, 'excludeDomain', 'currentTabWhitelistedDomain', 'wlDomainTitle');
+  renderWlButton(btnWlUrl, isUrlWL, 'excludeUrl', 'currentTabWhitelistedUrl', 'wlUrlTitle');
+  renderWlButton(btnWlTab, isTabExempt, 'excludeTab', 'currentTabWhitelistedTab', 'wlTabTitle');
+
+  btnWlDomain.dataset.action = isDomainWL ? 'remove' : 'add';
+  btnWlDomain.dataset.matchedEntry = matchedDomain || '';
+  btnWlUrl.dataset.action = isUrlWL ? 'remove' : 'add';
+  btnWlUrl.dataset.matchedEntry = matchedUrl || '';
+  btnWlTab.dataset.action = isTabExempt ? 'remove' : 'add';
+}
+
+// ---------------------------------------------------------------------------
+// Window Tabs Manager (DocumentFragment + Event Delegation + Zero-alloc Filter)
+// ---------------------------------------------------------------------------
+function updateTabsCountBadge(tabs) {
+  if (!tabsCountBadge) return;
+  let suspendedCount = 0;
+  for (let i = 0; i < tabs.length; i++) {
+    if (tabs[i].discarded) suspendedCount++;
+  }
+  tabsCountBadge.textContent = `${tabs.length} • ${suspendedCount} 💤`;
+}
+
+function buildWindowTabsDOM(tabs, exemptData) {
+  if (!tabsList) return;
+
+  const labelActive = I18n.t('tabStatusActive');
+  const labelSuspended = I18n.t('tabStatusSuspended');
+  const labelImmune = I18n.t('tabStatusImmune');
+  const labelInactive = I18n.t('tabStatusInactive');
+  const labelUntitled = I18n.t('untitledTab');
+  const labelWake = I18n.t('actionWake');
+  const labelSuspend = I18n.t('actionSuspend');
+
+  const fragment = document.createDocumentFragment();
+  _windowTabs = new Array(tabs.length);
+
+  for (let i = 0; i < tabs.length; i++) {
+    const tab = tabs[i];
+    const hostname = extractHostname(tab.url) || tab.url || '';
+    const isExempt = Boolean(exemptData[`exempt_tab_${tab.id}`]);
+    const immune = isTabImmune(tab, _settings, isExempt, _compiledWhitelist);
+
+    let statusClass = 'pill-inactive';
+    let statusLabel = labelInactive;
+    if (tab.active) {
+      statusClass = 'pill-active';
+      statusLabel = labelActive;
+    } else if (tab.discarded) {
+      statusClass = 'pill-suspended';
+      statusLabel = labelSuspended;
+    } else if (immune) {
+      statusClass = 'pill-immune';
+      statusLabel = labelImmune;
+    }
+
+    const titleText = tab.title || labelUntitled;
+    const urlText = tab.url || '';
+
+    const item = document.createElement('div');
+    item.className = tab.active ? 'tab-item active-tab' : 'tab-item';
+    item.dataset.tabId = String(tab.id);
+    item.dataset.discarded = tab.discarded ? 'true' : 'false';
+
+    // Left info
+    const info = document.createElement('div');
+    info.className = 'tab-info';
+
+    const fav = document.createElement('img');
+    fav.className = 'tab-favicon';
+    fav.loading = 'lazy';
+    fav.decoding = 'async';
+    fav.src = tab.favIconUrl || '../icons/icon16.png';
+    fav.onerror = () => {
+      fav.onerror = null;
+      fav.src = '../icons/icon16.png';
+    };
+    info.appendChild(fav);
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'tab-text-wrap';
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'tab-title';
+    titleEl.textContent = titleText;
+    titleEl.title = titleText;
+    textWrap.appendChild(titleEl);
+
+    const domainEl = document.createElement('span');
+    domainEl.className = 'tab-domain';
+    domainEl.textContent = hostname;
+    textWrap.appendChild(domainEl);
+
+    info.appendChild(textWrap);
+    item.appendChild(info);
+
+    // Right meta: status pill + quick action button
+    const meta = document.createElement('div');
+    meta.className = 'tab-meta';
+
+    const pill = document.createElement('span');
+    pill.className = `tab-status-pill ${statusClass}`;
+    pill.textContent = statusLabel;
+    meta.appendChild(pill);
+
+    if (tab.discarded) {
+      const btnWake = document.createElement('button');
+      btnWake.type = 'button';
+      btnWake.className = 'btn-tab-action';
+      btnWake.dataset.action = 'wake';
+      btnWake.title = labelWake;
+      btnWake.setAttribute('aria-label', labelWake);
+      btnWake.textContent = '🔄';
+      meta.appendChild(btnWake);
+    } else if (!tab.active && !isSystemUrl(tab.url)) {
+      const btnSuspend = document.createElement('button');
+      btnSuspend.type = 'button';
+      btnSuspend.className = 'btn-tab-action';
+      btnSuspend.dataset.action = 'suspend';
+      btnSuspend.title = labelSuspend;
+      btnSuspend.setAttribute('aria-label', labelSuspend);
+      btnSuspend.textContent = '💤';
+      meta.appendChild(btnSuspend);
+    }
+
+    item.appendChild(meta);
+    fragment.appendChild(item);
+
+    _windowTabs[i] = {
+      el: item,
+      searchText: `${titleText}\n${hostname}\n${urlText}`.toLowerCase()
+    };
+  }
+
+  tabsList.replaceChildren(fragment);
+  _tabsRendered = true;
+  applyTabsFilter();
+}
+
+function applyTabsFilter() {
+  if (!_tabsRendered) return;
+  const q = _filterQuery.toLowerCase();
+  let visibleCount = 0;
+
+  for (let i = 0; i < _windowTabs.length; i++) {
+    const entry = _windowTabs[i];
+    const matches = !q || entry.searchText.includes(q);
+    entry.el.classList.toggle('hidden', !matches);
+    if (matches) visibleCount++;
+  }
+
+  tabsEmpty?.classList.toggle('hidden', visibleCount > 0);
+}
+
+/**
+ * Refreshes current tab whitelist state, window tabs drawer (if expanded),
+ * and optionally session stats in a single batched pass.
+ */
+async function refreshTabState({ reloadSettings = false, reloadStats = false } = {}) {
+  try {
+    const [windowTabs, settings, discardedTabs] = await Promise.all([
+      chrome.tabs.query({ currentWindow: true }),
+      reloadSettings ? chrome.storage.sync.get(DEFAULT_SETTINGS) : Promise.resolve(_settings),
+      reloadStats ? chrome.tabs.query({ discarded: true }) : Promise.resolve(null)
+    ]);
+
+    _rawWindowTabs = windowTabs;
+    if (reloadSettings) {
+      _settings = settings;
+      _compiledWhitelist = compileWhitelist(settings.whitelist, settings.whitelistUrls);
+    }
+
+    if (discardedTabs) {
+      updateStats({
+        sessionSuspended: discardedTabs.length,
+        sessionSavedMB: discardedTabs.length * RAM_PER_TAB_MB
+      });
+    }
+
+    const activeTab = windowTabs.find((t) => t.active) || null;
+    updateTabsCountBadge(windowTabs);
+
+    const exemptKeys = _isCollapsed
+      ? (activeTab ? [`exempt_tab_${activeTab.id}`] : [])
+      : windowTabs.map((t) => `exempt_tab_${t.id}`);
+    const exemptData = exemptKeys.length > 0
+      ? await chrome.storage.session.get(exemptKeys)
+      : {};
+
+    renderCurrentTabRow(activeTab, exemptData);
+
+    if (!_isCollapsed) {
+      buildWindowTabsDOM(windowTabs, exemptData);
+    } else {
+      _tabsRendered = false;
+    }
+  } catch (err) {
+    console.error('Error refreshing tabs state:', err);
+  }
+}
+
+// Single delegated click listener for all tab rows and action buttons
+tabsList?.addEventListener('click', async (e) => {
+  const item = e.target.closest('.tab-item');
+  if (!item) return;
+
+  const tabId = Number(item.dataset.tabId);
+  if (!tabId) return;
+
+  const actionBtn = e.target.closest('.btn-tab-action');
+  if (actionBtn) {
+    e.stopPropagation();
+    const action = actionBtn.dataset.action;
+    if (action === 'wake') {
+      await chrome.tabs.update(tabId, { active: true });
+      try { await chrome.tabs.reload(tabId); } catch { /* ignore */ }
+      window.close();
+    } else if (action === 'suspend') {
+      actionBtn.disabled = true;
+      actionBtn.textContent = '⏳';
+      chrome.runtime.sendMessage({ action: 'suspendTab', tabId }, async () => {
+        showToast(I18n.t('toastTabSuspended'));
+        await refreshTabState({ reloadStats: true });
+      });
+    }
+    return;
+  }
+
+  const isDiscarded = item.dataset.discarded === 'true';
+  await chrome.tabs.update(tabId, { active: true });
+  if (isDiscarded) {
+    try { await chrome.tabs.reload(tabId); } catch { /* ignore */ }
+  }
+  window.close();
+});
 
 // ---------------------------------------------------------------------------
 // Whitelist domain button
@@ -188,7 +417,9 @@ btnWlDomain.addEventListener('click', async () => {
   }
 
   await chrome.storage.sync.set({ whitelist: updated });
-  await Promise.all([loadCurrentTab(), loadWindowTabs()]);
+  _settings.whitelist = updated;
+  _compiledWhitelist = compileWhitelist(_settings.whitelist, _settings.whitelistUrls);
+  await refreshTabState();
   showToast(I18n.t(isAdding ? 'toastDomainExcluded' : 'toastDomainRemoved', {
     domain: isAdding ? _currentHostname : targetDomain
   }));
@@ -213,7 +444,9 @@ btnWlUrl.addEventListener('click', async () => {
   }
 
   await chrome.storage.sync.set({ whitelistUrls: updated });
-  await Promise.all([loadCurrentTab(), loadWindowTabs()]);
+  _settings.whitelistUrls = updated;
+  _compiledWhitelist = compileWhitelist(_settings.whitelist, _settings.whitelistUrls);
+  await refreshTabState();
   const shortUrl = _currentNormalizedUrl.replace(/^https?:\/\//, '').slice(0, 30);
   showToast(isAdding
     ? I18n.t('toastUrlExcluded', { url: shortUrl })
@@ -232,7 +465,7 @@ btnWlTab.addEventListener('click', async () => {
   } else {
     await chrome.storage.session.remove(key);
   }
-  await Promise.all([loadCurrentTab(), loadWindowTabs()]);
+  await refreshTabState();
   showToast(I18n.t(isAdding ? 'toastTabProtected' : 'toastProtectionRemoved'));
 });
 
@@ -241,6 +474,7 @@ btnWlTab.addEventListener('click', async () => {
 // ---------------------------------------------------------------------------
 globalToggle.addEventListener('change', async () => {
   const enabled = globalToggle.checked;
+  _settings.enabled = enabled;
   await chrome.storage.sync.set({ enabled });
   updateStatusUI(enabled);
 });
@@ -249,7 +483,9 @@ globalToggle.addEventListener('change', async () => {
 // Timer selector
 // ---------------------------------------------------------------------------
 timerSelect.addEventListener('change', async () => {
-  await chrome.storage.sync.set({ thresholdMinutes: parseInt(timerSelect.value, 10) });
+  const thresholdMinutes = parseInt(timerSelect.value, 10);
+  _settings.thresholdMinutes = thresholdMinutes;
+  await chrome.storage.sync.set({ thresholdMinutes });
   showToast(I18n.t('toastTimerUpdated'));
 });
 
@@ -269,7 +505,7 @@ btnSuspendAll.addEventListener('click', () => {
     } else {
       showToast(I18n.t('toastManyTabsSuspended', { count }));
     }
-    await Promise.all([loadStats(), loadWindowTabs()]);
+    await refreshTabState({ reloadStats: true });
     btnSuspendAll.querySelector('span:last-child').textContent = I18n.t('suspendAll');
     btnSuspendAll.disabled = !globalToggle.checked;
   });
@@ -293,187 +529,26 @@ function applyTimerI18n() {
 }
 
 // ---------------------------------------------------------------------------
-// Window Tabs Manager
+// Collapsible Window Tabs Manager toggle
 // ---------------------------------------------------------------------------
-async function loadWindowTabs() {
-  try {
-    const tabs = await chrome.tabs.query({ currentWindow: true });
-    const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
-    const exemptData = await chrome.storage.session.get(tabs.map((t) => `exempt_tab_${t.id}`));
-
-    let suspendedCount = 0;
-    _windowTabs = tabs.map((tab) => {
-      if (tab.discarded) suspendedCount++;
-
-      let hostname = '';
-      try {
-        hostname = new URL(tab.url).hostname.replace(/^www\./, '');
-      } catch {
-        hostname = '';
-      }
-      if (!hostname) hostname = tab.url || '';
-
-      const isExempt = Boolean(exemptData[`exempt_tab_${tab.id}`]);
-      const immune = isTabImmune(tab, settings, isExempt);
-
-      let status = 'inactive';
-      let statusClass = 'pill-inactive';
-      let statusLabel = I18n.t('tabStatusInactive');
-
-      if (tab.active) {
-        status = 'active';
-        statusClass = 'pill-active';
-        statusLabel = I18n.t('tabStatusActive');
-      } else if (tab.discarded) {
-        status = 'suspended';
-        statusClass = 'pill-suspended';
-        statusLabel = I18n.t('tabStatusSuspended');
-      } else if (immune) {
-        status = 'immune';
-        statusClass = 'pill-immune';
-        statusLabel = I18n.t('tabStatusImmune');
-      }
-
-      return {
-        id: tab.id,
-        title: tab.title || I18n.t('untitledTab'),
-        url: tab.url || '',
-        favIconUrl: tab.favIconUrl,
-        active: tab.active,
-        discarded: tab.discarded,
-        hostname,
-        isImmune: immune,
-        status,
-        statusClass,
-        statusLabel
-      };
-    });
-
-    if (tabsCountBadge) {
-      tabsCountBadge.textContent = `${tabs.length} • ${suspendedCount} 💤`;
-    }
-
-    renderTabsList();
-  } catch (err) {
-    console.error('Error loading window tabs:', err);
-  }
-}
-
-function renderTabsList() {
-  if (!tabsList) return;
-  tabsList.innerHTML = '';
-
-  const q = _filterQuery.toLowerCase();
-  const filtered = _windowTabs.filter((tab) => {
-    if (!q) return true;
-    return tab.title.toLowerCase().includes(q) ||
-           tab.hostname.toLowerCase().includes(q) ||
-           tab.url.toLowerCase().includes(q);
-  });
-
-  if (filtered.length === 0) {
-    tabsEmpty?.classList.remove('hidden');
-    return;
-  }
-  tabsEmpty?.classList.add('hidden');
-
-  filtered.forEach((tab) => {
-    const item = document.createElement('div');
-    item.className = tab.active ? 'tab-item active-tab' : 'tab-item';
-
-    // Click row to switch to tab
-    item.addEventListener('click', async (e) => {
-      if (e.target.closest('.btn-tab-action')) return;
-      await chrome.tabs.update(tab.id, { active: true });
-      if (tab.discarded) {
-        try { await chrome.tabs.reload(tab.id); } catch { /* ignore */ }
-      }
-      window.close();
-    });
-
-    // Left info
-    const info = document.createElement('div');
-    info.className = 'tab-info';
-
-    const fav = document.createElement('img');
-    fav.className = 'tab-favicon';
-    fav.src = tab.favIconUrl || '../icons/icon16.png';
-    fav.onerror = () => { fav.src = '../icons/icon16.png'; };
-    info.appendChild(fav);
-
-    const textWrap = document.createElement('div');
-    textWrap.className = 'tab-text-wrap';
-
-    const title = document.createElement('span');
-    title.className = 'tab-title';
-    title.textContent = tab.title;
-    title.title = tab.title;
-    textWrap.appendChild(title);
-
-    const domain = document.createElement('span');
-    domain.className = 'tab-domain';
-    domain.textContent = tab.hostname;
-    textWrap.appendChild(domain);
-
-    info.appendChild(textWrap);
-    item.appendChild(info);
-
-    // Right meta: status pill + quick action button
-    const meta = document.createElement('div');
-    meta.className = 'tab-meta';
-
-    const pill = document.createElement('span');
-    pill.className = `tab-status-pill ${tab.statusClass}`;
-    pill.textContent = tab.statusLabel;
-    meta.appendChild(pill);
-
-    // Action button
-    if (tab.discarded) {
-      const btnWake = document.createElement('button');
-      btnWake.type = 'button';
-      btnWake.className = 'btn-tab-action';
-      btnWake.title = I18n.t('actionWake');
-      btnWake.setAttribute('aria-label', I18n.t('actionWake'));
-      btnWake.textContent = '🔄';
-      btnWake.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await chrome.tabs.update(tab.id, { active: true });
-        try { await chrome.tabs.reload(tab.id); } catch { /* ignore */ }
-        window.close();
-      });
-      meta.appendChild(btnWake);
-    } else if (!tab.active && !isSystemUrl(tab.url)) {
-      const btnSuspend = document.createElement('button');
-      btnSuspend.type = 'button';
-      btnSuspend.className = 'btn-tab-action';
-      btnSuspend.title = I18n.t('actionSuspend');
-      btnSuspend.setAttribute('aria-label', I18n.t('actionSuspend'));
-      btnSuspend.textContent = '💤';
-      btnSuspend.addEventListener('click', (e) => {
-        e.stopPropagation();
-        btnSuspend.disabled = true;
-        btnSuspend.textContent = '⏳';
-        chrome.runtime.sendMessage({ action: 'suspendTab', tabId: tab.id }, async () => {
-          showToast(I18n.t('toastTabSuspended'));
-          await Promise.all([loadStats(), loadWindowTabs()]);
-        });
-      });
-      meta.appendChild(btnSuspend);
-    }
-
-    item.appendChild(meta);
-    tabsList.appendChild(item);
-  });
-}
-
 async function toggleTabsManager() {
   tabsManagerCard?.classList.toggle('collapsed');
-  const isCollapsed = Boolean(tabsManagerCard?.classList.contains('collapsed'));
-  tabsManagerHeader?.setAttribute('aria-expanded', String(!isCollapsed));
-  await chrome.storage.local.set({ popupTabsCollapsed: isCollapsed });
+  _isCollapsed = Boolean(tabsManagerCard?.classList.contains('collapsed'));
+  tabsManagerHeader?.setAttribute('aria-expanded', String(!_isCollapsed));
+  chrome.storage.local.set({ popupTabsCollapsed: _isCollapsed }).catch(() => {});
+
+  if (!_isCollapsed && !_tabsRendered) {
+    const tabs = _rawWindowTabs.length > 0
+      ? _rawWindowTabs
+      : await chrome.tabs.query({ currentWindow: true });
+    const exemptKeys = tabs.map((t) => `exempt_tab_${t.id}`);
+    const exemptData = exemptKeys.length > 0
+      ? await chrome.storage.session.get(exemptKeys)
+      : {};
+    buildWindowTabsDOM(tabs, exemptData);
+  }
 }
 
-// Collapsible header toggle (click & keyboard)
 tabsManagerHeader?.addEventListener('click', toggleTabsManager);
 tabsManagerHeader?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') {
@@ -482,26 +557,52 @@ tabsManagerHeader?.addEventListener('keydown', (e) => {
   }
 });
 
-// Search filter
+// Instant in-memory search filter (zero DOM churn)
 tabSearchInput?.addEventListener('input', (e) => {
   _filterQuery = e.target.value.trim();
-  renderTabsList();
+  applyTabsFilter();
 });
 
 // ---------------------------------------------------------------------------
-// Initialize
+// Initialize (2 parallel phases, zero Service Worker wake-up)
 // ---------------------------------------------------------------------------
 async function init() {
-  await I18n.init();
+  // Phase 1: Parallel read of settings, local UI state, current window tabs, and discarded count
+  const [settings, { popupTabsCollapsed = false }, windowTabs, discardedTabs] = await Promise.all([
+    chrome.storage.sync.get(DEFAULT_SETTINGS),
+    chrome.storage.local.get('popupTabsCollapsed'),
+    chrome.tabs.query({ currentWindow: true }),
+    chrome.tabs.query({ discarded: true })
+  ]);
+
+  _settings = settings;
+  _compiledWhitelist = compileWhitelist(settings.whitelist, settings.whitelistUrls);
+  _rawWindowTabs = windowTabs;
+  _isCollapsed = Boolean(popupTabsCollapsed);
+
+  if (_isCollapsed) {
+    tabsManagerCard?.classList.add('collapsed');
+    tabsManagerHeader?.setAttribute('aria-expanded', 'false');
+  }
+
+  const activeTab = windowTabs.find((t) => t.active) || null;
+  const exemptKeys = _isCollapsed
+    ? (activeTab ? [`exempt_tab_${activeTab.id}`] : [])
+    : windowTabs.map((t) => `exempt_tab_${t.id}`);
+
+  // Phase 2: Parallel load of locale JSON + session exemptions
+  const [, exemptData] = await Promise.all([
+    I18n.init(settings.userLanguage),
+    exemptKeys.length > 0 ? chrome.storage.session.get(exemptKeys) : Promise.resolve({})
+  ]);
+
   I18n.apply();
   applyTimerI18n();
 
-  const { enabled = true, thresholdMinutes = 30 } =
-    await chrome.storage.sync.get(['enabled', 'thresholdMinutes']);
+  globalToggle.checked = settings.enabled;
+  updateStatusUI(settings.enabled);
 
-  globalToggle.checked = enabled;
-  updateStatusUI(enabled);
-
+  const thresholdMinutes = settings.thresholdMinutes;
   let opt = timerSelect.querySelector(`option[value="${thresholdMinutes}"]`);
   if (!opt) {
     opt = document.createElement('option');
@@ -511,15 +612,17 @@ async function init() {
   }
   opt.selected = true;
 
-  const { popupTabsCollapsed = false } = await chrome.storage.local.get('popupTabsCollapsed');
-  if (popupTabsCollapsed) {
-    tabsManagerCard?.classList.add('collapsed');
-    tabsManagerHeader?.setAttribute('aria-expanded', 'false');
-  }
+  updateStats({
+    sessionSuspended: discardedTabs.length,
+    sessionSavedMB: discardedTabs.length * RAM_PER_TAB_MB
+  });
 
-  loadStats();
-  loadCurrentTab();
-  loadWindowTabs();
+  renderCurrentTabRow(activeTab, exemptData);
+  updateTabsCountBadge(windowTabs);
+
+  if (!_isCollapsed) {
+    buildWindowTabsDOM(windowTabs, exemptData);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
