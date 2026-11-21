@@ -65,6 +65,7 @@ ram-saver/
 │   ├── options.css
 │   └── options.js
 ├── utils/
+│   ├── shared.js             # Shared constants & pure logic (SW, UI, Jest)
 │   └── i18n.js               # Custom i18n loader (supports language picker)
 ├── _locales/
 │   ├── en/messages.json
@@ -80,12 +81,12 @@ ram-saver/
 
 ## Testing
 
-The project has two test suites. **Requires Node.js ≥ 18.**
+The project has two test suites. **Requires Node.js ≥ 20.19 (Node 22 LTS recommended).**
 
 ### Setup
 
 ```bash
-npm install
+npm ci
 npx playwright install chromium   # for e2e only
 ```
 
@@ -126,17 +127,15 @@ Uses ESLint to catch syntax errors, undeclared variables, and code smell before 
 
 ```
 tests/
-├── helpers/
-│   └── utils.js              # Shared pure functions (mirrored from source)
 ├── unit/
-│   ├── tab-utils.test.js     # URL utility tests (~25 cases)
-│   ├── suspension-logic.test.js  # Eligibility logic tests (~30 cases)
-│   ├── validation.test.js    # Input validation tests (~20 cases)
-│   ├── manifest.test.js      # Manifest structure & permissions (~15 cases)
-│   ├── i18n.test.js          # Trilingual parity & integrity tests (~10 cases)
+│   ├── tab-utils.test.js         # URL & domain utility tests
+│   ├── suspension-logic.test.js  # Eligibility & immunity logic tests
+│   ├── validation.test.js        # Input validation & normalization tests
+│   ├── manifest.test.js          # Manifest structure, permissions & asset tests
+│   ├── i18n.test.js              # Trilingual parity & HTML key coverage tests
 │   └── extract-changelog.test.js # Changelog extraction for releases
 └── e2e/
-    └── extension.test.js     # Playwright UI tests (~40 cases)
+    └── extension.test.js         # Playwright UI tests
 ```
 
 ---
@@ -155,37 +154,7 @@ RAM Saver is built with a strict **privacy-first** design:
 
 ## Contributing
 
-Contributions are welcome and appreciated! Here's how to get started:
-
-1. **Fork** this repository and clone it locally
-2. **Create a branch** for your feature or fix:
-   ```bash
-   git checkout -b feat/your-feature-name
-   ```
-3. **Make your changes** — keep these guidelines in mind:
-   - Zero external dependencies (Vanilla JS only)
-   - All new user-facing strings must be added to all three locale files (`en`, `pt_BR`, `es`)
-   - Follow the existing code style (no bundler, no transpilation)
-   - Test by loading the extension unpacked in Chrome (`chrome://extensions`)
-4. **Commit** with a clear message:
-   ```bash
-   git commit -m "feat: add suspend on battery saver mode"
-   ```
-5. **Open a Pull Request** describing what you changed and why
-
-### Ideas for contributions
-
-- 🌐 Add more language translations
-- 📊 Per-tab memory display (if a future Chrome API enables it)
-- 🔔 Notification when a tab is about to be suspended
-- 🎨 Improve icon design
-
-### Reporting bugs
-
-Open an [issue on GitHub](https://github.com/WSixx/chrome-ram-saver/issues) with:
-- Chrome version
-- Steps to reproduce
-- Expected vs actual behavior
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on local setup, coding conventions, localization rules, testing, and pull requests.
 
 ---
 
