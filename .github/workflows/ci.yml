@@ -10,7 +10,7 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Esteira de Validação: Linting e Testes Unitários
+  # Validation Pipeline: Linting & Unit Tests
   # ---------------------------------------------------------------------------
   test:
     name: Lint & Unit Tests
@@ -20,23 +20,23 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Cache npm dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package.json') }}
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-npm-
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run ESLint (Code Quality & Bug Prevention)
         run: npm run lint

@@ -3,6 +3,9 @@
   "version": "1.10.1",
   "description": "Chrome extension for RAM saving via tab suspension",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "test": "jest",
     "test:unit": "jest tests/unit --verbose",
@@ -12,9 +15,9 @@
     "lint": "eslint ."
   },
   "devDependencies": {
-    "jest": "^30.5.1",
-    "@playwright/test": "^1.47.0",
-    "eslint": "^10.10.0",
-    "globals": "^16.0.0"
+    "@playwright/test": "^1.65.1",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "jest": "^30.5.2"
   }
 }
